@@ -367,7 +367,7 @@ export function Exam() {
                         <BarChart data={rows} layout="vertical" margin={{ left: 0, right: 12, top: 4, bottom: 4 }}>
                           <CartesianGrid horizontal={false} />
                           <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(1)} />
-                          <YAxis type="category" dataKey="label" width={118} tickLine={false} axisLine={false} />
+                          <YAxis type="category" dataKey="label" width={118} tickLine={false} axisLine={false} interval={0} fontSize={11} />
                           <ChartTooltip cursor={false} content={<ChartTooltipContent hideIndicator />} />
                           <Bar dataKey="contribution" radius={4}>
                             {rows.map((row) => (

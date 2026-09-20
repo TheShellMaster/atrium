@@ -593,7 +593,7 @@ export function Model() {
                   <BarChart data={coefs} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
                     <CartesianGrid horizontal={false} />
                     <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(1)} />
-                    <YAxis type="category" dataKey="name" width={210} tickLine={false} axisLine={false} />
+                    <YAxis type="category" dataKey="name" width={210} tickLine={false} axisLine={false} interval={0} fontSize={11} />
                     <ChartTooltip cursor={false} content={<ChartTooltipContent hideIndicator />} />
                     <Bar dataKey="coef" radius={4} animationDuration={1400}>
                       {coefs.map((row) => (

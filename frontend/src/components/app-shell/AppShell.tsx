@@ -33,9 +33,9 @@ function StorageBadge() {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Badge variant={cloud ? "default" : "destructive"} className="gap-1.5">
+        <Badge variant={cloud ? "default" : "destructive"} className="gap-1.5" aria-label={cloud ? "Supabase connecté" : "Supabase injoignable"}>
           {cloud ? <CloudIcon /> : <DatabaseIcon />}
-          {cloud ? "Supabase connecté" : "Supabase injoignable"}
+          <span className="hidden sm:inline">{cloud ? "Supabase connecté" : "Supabase injoignable"}</span>
         </Badge>
       </TooltipTrigger>
       <TooltipContent>
@@ -88,8 +88,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
-              <BreadcrumbItem>
-                <BreadcrumbPage>{current.crumb}</BreadcrumbPage>
+              <BreadcrumbItem className="min-w-0">
+                <BreadcrumbPage className="block max-w-[38vw] truncate md:max-w-none">{current.crumb}</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>

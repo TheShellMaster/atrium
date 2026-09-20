@@ -90,7 +90,12 @@ export function StatsPage() {
           />
         </RevealItem>
         <RevealItem>
-          <StatCard label="Hôpitaux" value={stats.sources.length} icon={BuildingIcon} hint="Cleveland, Budapest, Zurich/Bâle, Long Beach" />
+          <StatCard
+            label="Sources"
+            value={stats.sources.length}
+            icon={BuildingIcon}
+            hint={stats.sources.length > 4 ? "4 hôpitaux UCI + registre Atrium confirmé" : "Cleveland, Budapest, Zurich/Bâle, Long Beach"}
+          />
         </RevealItem>
         <RevealItem>
           <StatCard
@@ -109,7 +114,7 @@ export function StatsPage() {
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Quatre hôpitaux, quatre réalités</CardTitle>
+              <CardTitle>Quatre hôpitaux et le registre Atrium</CardTitle>
               <CardDescription>
                 La part de malades varie du simple au triple selon le recrutement : c'est le{" "}
                 <MedTerm id="desequilibre">déséquilibre des classes</MedTerm>.
@@ -157,7 +162,7 @@ export function StatsPage() {
                 <BarChart data={stats.correlations} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
                   <CartesianGrid horizontal={false} />
                   <XAxis type="number" domain={[-0.6, 0.6]} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(1)} />
-                  <YAxis type="category" dataKey="label" width={130} tickLine={false} axisLine={false} />
+                  <YAxis type="category" dataKey="label" width={130} tickLine={false} axisLine={false} interval={0} fontSize={11} />
                   <ChartTooltip cursor={false} content={<ChartTooltipContent hideIndicator />} />
                   <Bar dataKey="r" radius={4}>
                     {stats.correlations.map((row) => (

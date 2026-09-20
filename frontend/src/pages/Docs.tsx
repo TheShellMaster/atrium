@@ -204,6 +204,7 @@ export function Docs() {
 
         <RevealItem>
           <Section id="pages" title="5. Pages">
+            <div className="overflow-x-auto">
             <Table>
               <TableBody>
                 {[
@@ -227,6 +228,7 @@ export function Docs() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </Section>
         </RevealItem>
 
