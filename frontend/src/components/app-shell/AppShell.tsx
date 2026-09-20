@@ -16,8 +16,11 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { PointerTracker } from "@/components/PointerTracker";
+import { HeartbeatSound } from "@/components/HeartbeatSound";
+import { SoundToggle } from "@/components/SoundToggle";
 import { VesselBackground } from "@/components/heart/VesselBackground";
 import { HeartScene } from "@/components/heart/HeartScene";
+import { useScrollProgress } from "@/hooks/useScrollProgress";
 import { cn } from "@/lib/utils";
 import { AppSidebar, NAV } from "./AppSidebar";
 import { useData } from "@/context/Data";
@@ -46,11 +49,13 @@ function StorageBadge() {
 export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const { reload, error } = useData();
+  const progress = useScrollProgress();
   const current = NAV.find((n) => n.to === pathname) ?? NAV[0];
 
   return (
     <SidebarProvider>
       <PointerTracker />
+      <HeartbeatSound />
       <AppSidebar />
       <SidebarInset className="relative isolate overflow-x-clip">
         <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
@@ -60,10 +65,14 @@ export function AppShell({ children }: { children: ReactNode }) {
               seed={11}
               trunks={9}
               intensity={pathname === "/" ? 0.42 : 0.26}
-              center={[0.7, 0.48]}
-              reach={1.15}
+              center={[0.7, 0.42]}
+              reach={1.05}
+              grow={progress}
             />
-            <HeartScene className={cn("absolute inset-0 transition-opacity duration-1000", pathname === "/" ? "opacity-100" : "opacity-60")} />
+            <HeartScene
+              className={cn("absolute inset-0 transition-opacity duration-1000", pathname === "/" ? "opacity-100" : "opacity-60")}
+              scroll={progress}
+            />
           </div>
         </div>
         <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
@@ -91,6 +100,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             ) : (
               <StorageBadge />
             )}
+            <SoundToggle />
             <ThemeToggle />
           </div>
         </header>

@@ -16,12 +16,14 @@ import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet 
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { PageHeader } from "@/components/PageHeader";
 import { MedTerm } from "@/components/MedTerm";
+import { TicketDialog, ticketFromPrediction } from "@/components/ConsultationTicket";
 import { EcgLine } from "@/components/EcgLine";
 import { CountUp } from "@/components/StatCard";
 import { Reveal } from "@/components/Reveal";
 import { useCabinet } from "@/context/Cabinet";
 import { useData } from "@/context/Data";
 import { api } from "@/lib/api";
+import { audio } from "@/lib/audio";
 import { num, riskTone } from "@/lib/format";
 import type { Prediction } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -42,9 +44,10 @@ const GROUPS = [
   { legend: "Examens complémentaires", keys: ["ca", "thal"] },
 ];
 
+/** Deux vrais patients de la Cleveland Clinic (lignes 2 et 5 du fichier UCI). */
 const EXAMPLES = {
-  positive: { age: 63, sex: 1, cp: 3, trestbps: 145, chol: 233, fbs: 1, restecg: 0, thalach: 150, exang: 0, oldpeak: 2.3, slope: 0, ca: 0, thal: 1 },
-  negative: { age: 67, sex: 1, cp: 0, trestbps: 160, chol: 286, fbs: 0, restecg: 0, thalach: 108, exang: 1, oldpeak: 1.5, slope: 1, ca: 3, thal: 2 },
+  positive: { age: 67, sex: 1, cp: 3, trestbps: 160, chol: 286, fbs: 0, restecg: 2, thalach: 108, exang: 1, oldpeak: 1.5, slope: 1, ca: 3, thal: 1 },
+  negative: { age: 41, sex: 0, cp: 1, trestbps: 130, chol: 204, fbs: 0, restecg: 2, thalach: 172, exang: 0, oldpeak: 1.4, slope: 0, ca: 0, thal: 1 },
 };
 
 const TONE_TEXT = { safe: "text-safe", warn: "text-warn", risk: "text-risk" } as const;
@@ -96,7 +99,7 @@ export function Exam() {
 
   const load = (example: keyof typeof EXAMPLES) => {
     setValues(EXAMPLES[example]);
-    setName(example === "positive" ? "Patient 1 · Cleveland" : "Patient 167 · Cleveland");
+    setName(example === "positive" ? "Patient 2 · Cleveland" : "Patiente 5 · Cleveland");
     setResult(null);
   };
 
@@ -108,6 +111,7 @@ export function Exam() {
       const prediction = await api.predict({ ...catalog.defaults, ...values, full_name: name || null, persist: true });
       setResult(prediction);
       setMood(prediction.label === 1 ? "warn" : "expand");
+      audio.chime(prediction.label === 1 ? "risk" : "safe");
       const store = prediction.patient?.store === "supabase" ? "Supabase" : "la copie locale";
       toast.success(`Dossier enregistré dans ${store}`, {
         description: `Probabilité ${(prediction.probability * 100).toFixed(1)} % · risque ${prediction.risk}`,
@@ -128,8 +132,9 @@ export function Exam() {
           title="Examen d'un patient"
           description={
             <>
-              Treize variables du jeu UCI Cleveland. La <MedTerm id="regression">régression logistique</MedTerm> calcule un
-              score, la sigmoïde le transforme en probabilité, le <MedTerm id="seuil">seuil</MedTerm> tranche.
+              Treize variables du jeu <MedTerm id="uci">UCI</MedTerm>. La <MedTerm id="regression">régression logistique</MedTerm>{" "}
+              calcule un <MedTerm id="logit">score z</MedTerm>, la <MedTerm id="sigmoide">sigmoïde</MedTerm> le transforme en
+              probabilité, le <MedTerm id="seuil">seuil</MedTerm> tranche.
             </>
           }
           actions={
@@ -346,12 +351,12 @@ export function Exam() {
               )}
             </CardContent>
             {result ? (
-              <CardFooter className="justify-between gap-2 text-xs">
-                <span className="truncate text-muted-foreground">{result.full_name || "Dossier anonyme"}</span>
+              <CardFooter className="flex-wrap justify-between gap-2 text-xs">
                 <Badge variant={result.patient?.store === "supabase" ? "default" : "secondary"} className="gap-1.5">
                   {result.patient?.store === "supabase" ? <CloudIcon /> : <DatabaseIcon />}
                   {result.patient?.store === "supabase" ? "Enregistré dans Supabase" : "Copie locale"}
                 </Badge>
+                <TicketDialog data={ticketFromPrediction(result)} />
               </CardFooter>
             ) : null}
           </Card>

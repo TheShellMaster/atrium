@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from atrium.data import source_summary
 from atrium.features import CATEGORICAL, CHOICES, FEATURE_META, FEATURE_ORDER, NUMERIC
 from atrium.model import load_dataset
 
@@ -13,7 +14,7 @@ def descriptive_stats() -> dict:
     data = load_dataset()
     numeric = []
     for col in NUMERIC:
-        series = data[col]
+        series = data[col].dropna()
         counts, edges = np.histogram(series, bins=12)
         numeric.append(
             {
@@ -32,9 +33,10 @@ def descriptive_stats() -> dict:
                     {"bin": f"{edges[i]:.0f}–{edges[i + 1]:.0f}", "start": float(edges[i]), "count": int(counts[i])}
                     for i in range(len(counts))
                 ],
+                "missing": int(data[col].isna().sum()),
                 "by_target": {
-                    "atteint": float(series[data["target"] == 1].mean()),
-                    "preserve": float(series[data["target"] == 0].mean()),
+                    "atteint": float(data.loc[data["target"] == 1, col].mean()),
+                    "preserve": float(data.loc[data["target"] == 0, col].mean()),
                 },
             }
         )
@@ -43,7 +45,7 @@ def descriptive_stats() -> dict:
     for col in CATEGORICAL:
         labels = dict(CHOICES.get(col, []))
         rows = []
-        for code, group in data.groupby(col):
+        for code, group in data.dropna(subset=[col]).groupby(col):
             rows.append(
                 {
                     "code": int(code),
@@ -57,7 +59,8 @@ def descriptive_stats() -> dict:
     target_counts = data["target"].value_counts().to_dict()
     correlations = []
     for col in FEATURE_ORDER:
-        corr = float(np.corrcoef(data[col].astype(float), data["target"].astype(float))[0, 1])
+        pair = data[[col, "target"]].dropna()
+        corr = float(pair[col].astype(float).corr(pair["target"].astype(float)))
         correlations.append({"feature": col, "label": FEATURE_META[col]["label"], "r": corr})
     correlations.sort(key=lambda r: abs(r["r"]), reverse=True)
 
@@ -71,6 +74,7 @@ def descriptive_stats() -> dict:
 
     return {
         "n": int(len(data)),
+        "sources": source_summary(data),
         "target": {
             "atteint": int(target_counts.get(1, 0)),
             "preserve": int(target_counts.get(0, 0)),
@@ -86,7 +90,7 @@ def descriptive_stats() -> dict:
 def linear_regression(x: str, y: str) -> dict:
     if x not in NUMERIC or y not in NUMERIC or x == y:
         raise ValueError("Choisis deux variables numériques différentes.")
-    data = load_dataset()
+    data = load_dataset().dropna(subset=[x, y])
     xs = data[x].astype(float).to_numpy()
     ys = data[y].astype(float).to_numpy()
     slope, intercept = np.polyfit(xs, ys, 1)

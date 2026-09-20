@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, XAxis, YAxis } from "recharts";
+import { useEffect, useMemo, useState } from "react";
+import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, LineChart, ReferenceLine, Scatter, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { ActivityIcon, CrosshairIcon, RefreshCwIcon, ShieldCheckIcon, TargetIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { PageHeader } from "@/components/PageHeader";
 import { MedTerm } from "@/components/MedTerm";
@@ -16,7 +18,7 @@ import { Reveal, RevealGroup, RevealItem } from "@/components/Reveal";
 import { useData } from "@/context/Data";
 import { api } from "@/lib/api";
 import { num, pct } from "@/lib/format";
-import type { Catalog, ModelCard } from "@/lib/types";
+import type { Catalog, ModelCard, Regression } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const rocConfig: ChartConfig = {
@@ -27,6 +29,269 @@ const rocConfig: ChartConfig = {
 const coefConfig: ChartConfig = {
   coef: { label: "Coefficient", color: "var(--color-risk)" },
 };
+
+const sigmoidConfig: ChartConfig = {
+  p: { label: "P(atteint)", color: "var(--color-primary)" },
+  atteint: { label: "Patients atteints", color: "var(--color-risk)" },
+  preserve: { label: "Patients préservés", color: "var(--color-safe)" },
+};
+
+const regressionConfig: ChartConfig = {
+  atteint: { label: "Atteints", color: "var(--color-risk)" },
+  preserve: { label: "Préservés", color: "var(--color-safe)" },
+  droite: { label: "Droite ajustée", color: "var(--color-primary)" },
+};
+
+const NUMERIC_KEYS = ["age", "trestbps", "chol", "thalach", "oldpeak"];
+
+function LinearRegressionPanel({ catalog }: { catalog: Catalog }) {
+  const [x, setX] = useState("age");
+  const [y, setY] = useState("thalach");
+  const [reg, setReg] = useState<Regression | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (x === y) return;
+    api
+      .regression(x, y)
+      .then((r) => {
+        setReg(r);
+        setError(null);
+      })
+      .catch((err: Error) => setError(err.message));
+  }, [x, y]);
+
+  const atteints = useMemo(() => reg?.points.filter((p) => p.target === 1) ?? [], [reg]);
+  const preserves = useMemo(() => reg?.points.filter((p) => p.target === 0) ?? [], [reg]);
+  const label = (key: string) => catalog.meta[key]?.label ?? key;
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-5">
+      <Card className="lg:col-span-3">
+        <CardHeader>
+          <CardTitle>Régression linéaire</CardTitle>
+          <CardDescription>
+            Une <MedTerm id="lineaire">droite</MedTerm> y = a·x + b ajustée aux {reg?.n ?? "…"} patients par les moindres carrés.
+            Chaque point est un patient réel.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="reg-x">Variable explicative (x)</FieldLabel>
+              <Select value={x} onValueChange={setX}>
+                <SelectTrigger id="reg-x" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {NUMERIC_KEYS.map((k) => (
+                      <SelectItem key={k} value={k} disabled={k === y}>
+                        {label(k)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="reg-y">Variable expliquée (y)</FieldLabel>
+              <Select value={y} onValueChange={setY}>
+                <SelectTrigger id="reg-y" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {NUMERIC_KEYS.map((k) => (
+                      <SelectItem key={k} value={k} disabled={k === x}>
+                        {label(k)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {reg ? (
+            <ChartContainer config={regressionConfig} className="aspect-auto h-[360px] w-full">
+              <ComposedChart margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+                <CartesianGrid />
+                <XAxis
+                  type="number"
+                  dataKey="x"
+                  name={reg.x_label}
+                  domain={["dataMin", "dataMax"]}
+                  tickFormatter={(v: number) => v.toFixed(0)}
+                  label={{ value: `${reg.x_label}${reg.x_unit ? ` (${reg.x_unit})` : ""}`, position: "insideBottom", offset: -4, className: "fill-muted-foreground" }}
+                />
+                <YAxis
+                  type="number"
+                  dataKey="y"
+                  name={reg.y_label}
+                  domain={["auto", "auto"]}
+                  tickFormatter={(v: number) => v.toFixed(0)}
+                  label={{ value: `${reg.y_label}${reg.y_unit ? ` (${reg.y_unit})` : ""}`, angle: -90, position: "insideLeft", className: "fill-muted-foreground" }}
+                />
+                <ChartTooltip cursor={{ strokeDasharray: "3 3" }} content={<ChartTooltipContent hideLabel />} />
+                <Scatter name="preserve" data={preserves} fill="var(--color-preserve)" fillOpacity={0.55} isAnimationActive={false} />
+                <Scatter name="atteint" data={atteints} fill="var(--color-atteint)" fillOpacity={0.55} isAnimationActive={false} />
+                <Scatter
+                  name="droite"
+                  data={reg.line}
+                  fill="transparent"
+                  line={{ stroke: "var(--color-droite)", strokeWidth: 2.5 }}
+                  shape={() => <g />}
+                  isAnimationActive={false}
+                />
+              </ComposedChart>
+            </ChartContainer>
+          ) : (
+            <Skeleton className="h-[360px]" />
+          )}
+        </CardContent>
+      </Card>
+      <Card className="lg:col-span-2">
+        <CardHeader>
+          <CardTitle>Lecture de la droite</CardTitle>
+          <CardDescription>{reg?.equation ?? "…"}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 text-sm">
+          {reg ? (
+            <>
+              <div className="flex items-start justify-between gap-3 border-b pb-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-medium"><MedTerm id="pente">Pente</MedTerm> a</span>
+                  <span className="text-xs text-muted-foreground">variation de y quand x augmente de 1</span>
+                </div>
+                <span className="whitespace-nowrap text-lg font-semibold tabular-nums">{num(reg.slope, 3)}</span>
+              </div>
+              <div className="flex items-start justify-between gap-3 border-b pb-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-medium">Ordonnée à l'origine b</span>
+                  <span className="text-xs text-muted-foreground">valeur de y quand x = 0</span>
+                </div>
+                <span className="whitespace-nowrap text-lg font-semibold tabular-nums">{num(reg.intercept, 2)}</span>
+              </div>
+              <div className="flex items-start justify-between gap-3 border-b pb-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-medium"><MedTerm id="correlation">Corrélation</MedTerm> r</span>
+                  <span className="text-xs text-muted-foreground">force et sens du lien linéaire</span>
+                </div>
+                <span className="whitespace-nowrap text-lg font-semibold tabular-nums">{num(reg.r, 3)}</span>
+              </div>
+              <div className="flex items-start justify-between gap-3 border-b pb-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-medium"><MedTerm id="r2">R²</MedTerm></span>
+                  <span className="text-xs text-muted-foreground">part de la variation expliquée</span>
+                </div>
+                <span className="whitespace-nowrap text-lg font-semibold tabular-nums">{pct(reg.r2)}</span>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-medium"><MedTerm id="rmse">RMSE</MedTerm></span>
+                  <span className="text-xs text-muted-foreground">erreur moyenne de la droite{reg.y_unit ? ` (${reg.y_unit})` : ""}</span>
+                </div>
+                <span className="whitespace-nowrap text-lg font-semibold tabular-nums">{num(reg.rmse, 2)}</span>
+              </div>
+              <p className="pt-2 text-xs text-muted-foreground">
+                La régression linéaire prédit une valeur continue. Pour prédire un oui/non (atteint ou non), on passe à la{" "}
+                <MedTerm id="regression">régression logistique</MedTerm> : même score linéaire, mais écrasé par la{" "}
+                <MedTerm id="sigmoide">sigmoïde</MedTerm>.
+              </p>
+            </>
+          ) : (
+            <Skeleton className="h-64" />
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SigmoidPanel({ model }: { model: ModelCard }) {
+  const atteints = useMemo(() => model.sigmoid.patients.filter((p) => p.y === 1), [model]);
+  const preserves = useMemo(() => model.sigmoid.patients.filter((p) => p.y === 0), [model]);
+  return (
+    <div className="grid gap-4 lg:grid-cols-5">
+      <Card className="lg:col-span-3">
+        <CardHeader>
+          <CardTitle>La sigmoïde</CardTitle>
+          <CardDescription>
+            P = 1 / (1 + e⁻ᶻ). Chaque point est un patient du jeu de test placé selon son <MedTerm id="logit">score z</MedTerm> ;
+            sa hauteur est la probabilité que le modèle lui attribue.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={sigmoidConfig} className="aspect-auto h-[360px] w-full">
+            <ComposedChart data={model.sigmoid.curve} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+              <CartesianGrid />
+              <XAxis
+                type="number"
+                dataKey="z"
+                domain={[-6, 6]}
+                tickFormatter={(v: number) => v.toFixed(0)}
+                label={{ value: "score z = b₀ + Σ bᵢ·xᵢ", position: "insideBottom", offset: -4, className: "fill-muted-foreground" }}
+              />
+              <YAxis
+                type="number"
+                dataKey="p"
+                domain={[0, 1]}
+                tickFormatter={(v: number) => v.toFixed(1)}
+                label={{ value: "probabilité", angle: -90, position: "insideLeft", className: "fill-muted-foreground" }}
+              />
+              <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+              <ReferenceLine y={0.5} stroke="var(--color-muted-foreground)" strokeDasharray="4 4" label={{ value: "seuil 0,5", position: "insideTopLeft", className: "fill-muted-foreground", fontSize: 11 }} />
+              <ReferenceLine x={0} stroke="var(--color-muted-foreground)" strokeDasharray="4 4" />
+              <Scatter name="preserve" data={preserves} fill="var(--color-preserve)" fillOpacity={0.7} isAnimationActive={false} />
+              <Scatter name="atteint" data={atteints} fill="var(--color-atteint)" fillOpacity={0.7} isAnimationActive={false} />
+              <Line type="monotone" dataKey="p" stroke="var(--color-p)" strokeWidth={2.5} dot={false} animationDuration={1600} />
+            </ComposedChart>
+          </ChartContainer>
+        </CardContent>
+      </Card>
+      <Card className="lg:col-span-2">
+        <CardHeader>
+          <CardTitle>Pourquoi une courbe en S ?</CardTitle>
+          <CardDescription>Trois propriétés qui font tout le modèle.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 text-sm">
+          <div className="flex flex-col gap-1">
+            <span className="font-medium">Elle borne le score</span>
+            <p className="text-muted-foreground">
+              Le <MedTerm id="logit">score z</MedTerm> peut valoir −8 ou +12 ; la <MedTerm id="sigmoide">sigmoïde</MedTerm> le
+              ramène toujours entre 0 et 1, donc lisible comme une probabilité.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="font-medium">z = 0 vaut exactement 0,5</span>
+            <p className="text-muted-foreground">
+              Le <MedTerm id="seuil">seuil</MedTerm> de décision 0,5 correspond au point où les poids pour et contre s'annulent.
+              Déplacer le seuil, c'est déplacer la ligne pointillée.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="font-medium">Les erreurs se voient</span>
+            <p className="text-muted-foreground">
+              Un point rouge sous la ligne pointillée est un <MedTerm id="fn">faux négatif</MedTerm> ; un point vert au-dessus,
+              un <MedTerm id="fp">faux positif</MedTerm>. Plus les couleurs se séparent, meilleur est le modèle.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 pt-2">
+            <div className="rounded-lg bg-risk/15 p-3 text-risk">
+              <div className="text-xs opacity-80">atteints (test)</div>
+              <div className="text-2xl font-semibold tabular-nums">{atteints.length}</div>
+            </div>
+            <div className="rounded-lg bg-safe/15 p-3 text-safe">
+              <div className="text-xs opacity-80">préservés (test)</div>
+              <div className="text-2xl font-semibold tabular-nums">{preserves.length}</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 function humanize(name: string, catalog: Catalog | null): string {
   if (!catalog) return name;
@@ -162,13 +427,23 @@ export function Model() {
 
       <Reveal delay={0.15}>
         <Tabs defaultValue="confusion" className="gap-4">
-          <TabsList>
+          <TabsList className="h-auto flex-wrap">
             <TabsTrigger value="confusion">Matrice de confusion</TabsTrigger>
+            <TabsTrigger value="sigmoid">Sigmoïde</TabsTrigger>
             <TabsTrigger value="roc">Courbe ROC</TabsTrigger>
             <TabsTrigger value="coefs">Coefficients</TabsTrigger>
+            <TabsTrigger value="linear">Régression linéaire</TabsTrigger>
             <TabsTrigger value="formulas">Formules du cours</TabsTrigger>
             <TabsTrigger value="data">Données</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="sigmoid">
+            <SigmoidPanel model={model} />
+          </TabsContent>
+
+          <TabsContent value="linear">
+            <LinearRegressionPanel catalog={catalog} />
+          </TabsContent>
 
           <TabsContent value="confusion">
             <div className="grid gap-4 lg:grid-cols-5">

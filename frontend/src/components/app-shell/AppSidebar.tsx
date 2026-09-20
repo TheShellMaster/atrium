@@ -1,5 +1,13 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { ActivityIcon, BookOpenIcon, LayoutDashboardIcon, StethoscopeIcon, UsersIcon } from "lucide-react";
+import {
+  ActivityIcon,
+  BarChart3Icon,
+  BookOpenIcon,
+  FileTextIcon,
+  LayoutDashboardIcon,
+  StethoscopeIcon,
+  UsersIcon,
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -23,8 +31,10 @@ export const NAV = [
   { to: "/", label: "Tableau de bord", icon: LayoutDashboardIcon, crumb: "Tableau de bord" },
   { to: "/examen", label: "Examen", icon: StethoscopeIcon, crumb: "Examen d'un patient" },
   { to: "/modele", label: "Modèle", icon: ActivityIcon, crumb: "Modèle & métriques" },
+  { to: "/statistiques", label: "Statistiques", icon: BarChart3Icon, crumb: "Statistiques descriptives" },
   { to: "/patients", label: "Registre", icon: UsersIcon, crumb: "Registre des patients" },
   { to: "/lexique", label: "Lexique", icon: BookOpenIcon, crumb: "Lexique médical" },
+  { to: "/documentation", label: "Documentation", icon: FileTextIcon, crumb: "Documentation" },
 ] as const;
 
 export function AppSidebar() {
@@ -72,7 +82,7 @@ export function AppSidebar() {
       <SidebarFooter className="gap-3 group-data-[collapsible=icon]:hidden">
         <EcgLine className="h-8" tone="muted" />
         <div className="flex items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
-          <span>UCI Cleveland · 303 patients</span>
+          <span>UCI · {model?.n_total ?? "…"} patients</span>
           {model ? <Badge variant="outline">AUC {num(model.auc, 3)}</Badge> : null}
         </div>
       </SidebarFooter>

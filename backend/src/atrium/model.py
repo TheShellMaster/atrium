@@ -7,6 +7,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import train_test_split
@@ -14,12 +15,14 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from atrium.config import settings
+from atrium.data import load_uci_dataset, source_summary
 from atrium.features import CATEGORICAL, FEATURE_META, FEATURE_ORDER, NUMERIC
 from atrium.metrics import from_predictions, pack, roc_points
 
 DATASET = settings.data_dir / "heart.csv"
 MODEL_PATH = settings.models_dir / "cardio.joblib"
 METRICS_PATH = settings.models_dir / "metrics.json"
+DATASET_LABEL = "UCI Heart Disease — 4 hôpitaux (Cleveland, Budapest, Zurich/Bâle, Long Beach VA)"
 
 
 def _clean_frame(frame: pd.DataFrame) -> pd.DataFrame:
@@ -42,6 +45,11 @@ def ensure_dataset() -> Path:
 
 
 def load_dataset() -> pd.DataFrame:
+    """Jeu complet UCI (920 patients, 4 hôpitaux). Colonnes : features, target, source."""
+    return load_uci_dataset()
+
+
+def load_cleveland() -> pd.DataFrame:
     ensure_dataset()
     return _clean_frame(pd.read_csv(DATASET))
 
@@ -49,15 +57,24 @@ def load_dataset() -> pd.DataFrame:
 def build_pipeline() -> Pipeline:
     prepare = ColumnTransformer(
         [
-            ("num", StandardScaler(), NUMERIC),
+            (
+                "num",
+                Pipeline([("impute", SimpleImputer(strategy="median")), ("scale", StandardScaler())]),
+                NUMERIC,
+            ),
             (
                 "cat",
-                OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                Pipeline(
+                    [
+                        ("impute", SimpleImputer(strategy="most_frequent")),
+                        ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+                    ]
+                ),
                 CATEGORICAL,
             ),
         ]
     )
-    clf = LogisticRegression(max_iter=400, C=1.2, solver="lbfgs")
+    clf = LogisticRegression(max_iter=600, C=1.0, solver="lbfgs")
     return Pipeline([("prep", prepare), ("clf", clf)])
 
 
@@ -94,8 +111,15 @@ def train(random_state: int = 42) -> dict:
                 for z, p, y in zip(logits, proba, y_test.to_numpy(), strict=True)
             ],
         },
-        "dataset": "UCI Heart Disease (Cleveland), 303 patients réels",
-        "notes": "Régression logistique entraînée sur un quart de test stratifié.",
+        "dataset": f"{DATASET_LABEL}, {len(data)} patients réels",
+        "sources": source_summary(data),
+        "missing": {
+            col: float(data[col].isna().mean()) for col in FEATURE_ORDER if data[col].isna().any()
+        },
+        "notes": (
+            "Régression logistique (scikit-learn) : imputation médiane / mode, standardisation, "
+            "one-hot, jeu de test stratifié de 25 %."
+        ),
     }
     settings.models_dir.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipe, MODEL_PATH)
@@ -106,13 +130,24 @@ def train(random_state: int = 42) -> dict:
 def coefficient_table(pipe: Pipeline) -> list[dict]:
     prep: ColumnTransformer = pipe.named_steps["prep"]
     clf: LogisticRegression = pipe.named_steps["clf"]
-    names = prep.get_feature_names_out()
+    names = [_short_name(n) for n in prep.get_feature_names_out()]
     coefs = clf.coef_[0]
     rows = []
     for name, coef in zip(names, coefs, strict=True):
         rows.append({"name": name, "coef": float(coef)})
     rows.sort(key=lambda r: abs(r["coef"]), reverse=True)
     return rows
+
+
+def _short_name(name: str) -> str:
+    """'num__age' et 'cat__cp_3.0' → 'num__age' / 'cat__cp_3'."""
+    if name.startswith("cat__"):
+        head, _, code = name.rpartition("_")
+        try:
+            return f"{head}_{int(float(code))}"
+        except ValueError:
+            return name
+    return name
 
 
 def load_model() -> Pipeline:
@@ -128,8 +163,9 @@ def load_metrics() -> dict:
 
 
 def as_frame(payload: dict) -> pd.DataFrame:
-    row = {key: payload[key] for key in FEATURE_ORDER}
-    return pd.DataFrame([row], columns=FEATURE_ORDER)
+    """Une ligne de features, tolérante aux valeurs manquantes (imputées par le pipeline)."""
+    row = {key: payload.get(key) for key in FEATURE_ORDER}
+    return pd.DataFrame([row], columns=FEATURE_ORDER).astype(float)
 
 
 def predict_one(payload: dict) -> dict:
@@ -153,7 +189,7 @@ def local_contributions(pipe: Pipeline, frame: pd.DataFrame) -> list[dict]:
     prep: ColumnTransformer = pipe.named_steps["prep"]
     clf: LogisticRegression = pipe.named_steps["clf"]
     transformed = prep.transform(frame)[0]
-    names = prep.get_feature_names_out()
+    names = [_short_name(n) for n in prep.get_feature_names_out()]
     contribs = transformed * clf.coef_[0]
     grouped: dict[str, float] = {key: 0.0 for key in FEATURE_ORDER}
     for name, value in zip(names, contribs, strict=True):

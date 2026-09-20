@@ -4,11 +4,12 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { useCabinet } from "@/context/Cabinet";
 import { useTheme } from "@/components/theme/ThemeProvider";
+import { heartClock } from "@/lib/heartClock";
 import type { HeartMood } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-/** Modèles essayés dans l'ordre : cœur réel (Sketchfab, CC BY 4.0), cœur Blender, puis repli procédural. */
-const MODEL_URLS = ["/models/heart-real.glb", "/models/heart.glb"];
+/** Cœur anatomique low-poly (dérivé CC BY 4.0, voir public/models/CREDITS.md), puis repli procédural. */
+const MODEL_URLS = ["/models/heart-lowpoly.glb"];
 
 const RHYTHM: Record<HeartMood, { bpm: number; depth: number; glow: number }> = {
   idle: { bpm: 62, depth: 0.035, glow: 0.8 },
@@ -98,17 +99,26 @@ function makeTranslucent(root: THREE.Object3D, opacity: number) {
     const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     for (const m of mats) {
       if (m instanceof THREE.MeshStandardMaterial) {
+        m.map = null;
+        m.normalMap = null;
+        m.roughnessMap = null;
+        m.metalnessMap = null;
+        m.color = new THREE.Color(0xd9536a);
+        m.roughness = 0.65;
+        m.metalness = 0;
+        m.flatShading = true;
         m.transparent = true;
         m.opacity = opacity;
         m.depthWrite = true;
         m.side = THREE.FrontSide;
-        m.envMapIntensity = 0.6;
+        m.envMapIntensity = 0.5;
         m.emissive = new THREE.Color(0x3a0a16);
         m.emissiveIntensity = 0.25;
+        m.needsUpdate = true;
         bases.push(m);
       }
     }
-    const rim = rimMaterial(/vein|veine/i.test(mesh.name) ? 0x8a5cff : 0xff4d6d);
+    const rim = rimMaterial(/vein|veine/i.test(mesh.name) ? 0x8a5cff : 0xff6b86);
     const shell = new THREE.Mesh(mesh.geometry, rim);
     shell.renderOrder = 2;
     mesh.add(shell);
@@ -121,17 +131,28 @@ function makeTranslucent(root: THREE.Object3D, opacity: number) {
  * Cœur 3D translucide en arrière-plan de toute l'interface.
  * Bat au rythme des termes survolés, suit légèrement la souris, s'allume en alerte.
  */
-export function HeartScene({ className, side = "right" }: { className?: string; side?: "right" | "center" }) {
+export function HeartScene({
+  className,
+  side = "right",
+  scroll = 0,
+}: {
+  className?: string;
+  side?: "right" | "center";
+  /** Progression du défilement (0..1) : le cœur remonte et laisse place aux vaisseaux. */
+  scroll?: number;
+}) {
   const host = useRef<HTMLDivElement>(null);
   const { mood, pointer } = useCabinet();
   const { theme } = useTheme();
   const moodRef = useRef<HeartMood>(mood);
   const pointerRef = useRef(pointer);
   const themeRef = useRef(theme);
+  const scrollRef = useRef(scroll);
   const [source, setSource] = useState<"real" | "blender" | "fallback" | "loading">("loading");
   moodRef.current = mood;
   pointerRef.current = pointer;
   themeRef.current = theme;
+  scrollRef.current = scroll;
 
   useEffect(() => {
     const el = host.current;
@@ -214,7 +235,7 @@ export function HeartScene({ className, side = "right" }: { className?: string; 
       const halfWidth = Math.tan((camera.fov * Math.PI) / 360) * camera.position.z * camera.aspect;
       const wide = w > 1024;
       root.position.x = side === "right" && wide ? halfWidth * 0.42 : 0;
-      root.position.y = wide ? -0.1 : 0.3;
+      root.userData.baseY = wide ? -0.1 : 0.3;
       root.userData.scale = wide ? 1 : 0.7;
     };
     layout();
@@ -223,17 +244,19 @@ export function HeartScene({ className, side = "right" }: { className?: string; 
 
     const tick = () => {
       const dt = clock.getDelta();
-      const t = clock.elapsedTime;
       const rhythm = RHYTHM[moodRef.current];
-      const phase = (t * rhythm.bpm) / 60;
-      const beat = beatCurve(phase - Math.floor(phase)) * rhythm.depth;
-      root.scale.setScalar((1 + beat) * (root.userData.scale ?? 1));
+      heartClock.update(rhythm.bpm);
+      const beat = beatCurve(heartClock.phase()) * rhythm.depth;
+      const s = scrollRef.current;
+      root.scale.setScalar((1 + beat) * (root.userData.scale ?? 1) * (1 - s * 0.35));
 
       const px = pointerRef.current.x * 2 - 1;
       const py = pointerRef.current.y * 2 - 1;
       spin += dt * 0.12;
       root.rotation.y += (spin + px * 0.35 - root.rotation.y) * 0.05;
       root.rotation.x += (py * 0.18 - root.rotation.x) * 0.05;
+      const baseY = root.userData.baseY ?? 0;
+      root.position.y += (baseY + s * 1.7 - root.position.y) * 0.08;
 
       const dark = themeRef.current === "dark";
       const glow = rhythm.glow * (dark ? 1 : 0.45);

@@ -1,4 +1,4 @@
-import type { Catalog, ModelCard, PatientRow, Prediction } from "./types";
+import type { Catalog, ImportResult, ModelCard, PatientRow, Prediction, Regression, Stats } from "./types";
 
 async function read<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -19,4 +19,24 @@ export const api = {
   patients: () => read<{ items: PatientRow[]; storage: { supabase: boolean; sqlite: string } }>("/api/patients"),
   predict: (body: Record<string, unknown>) =>
     read<Prediction>("/api/predict", { method: "POST", body: JSON.stringify(body) }),
+  stats: () => read<Stats>("/api/stats"),
+  regression: (x: string, y: string) => read<Regression>(`/api/regression?x=${x}&y=${y}`),
+  importFile: async (file: File, persist = true): Promise<ImportResult> => {
+    const body = new FormData();
+    body.append("file", file);
+    const response = await fetch(`/api/import?persist=${persist}`, { method: "POST", body });
+    if (!response.ok) {
+      const text = await response.text();
+      let detail = text;
+      try {
+        detail = (JSON.parse(text) as { detail?: string }).detail ?? text;
+      } catch {
+        /* texte brut */
+      }
+      throw new Error(detail || response.statusText);
+    }
+    return response.json() as Promise<ImportResult>;
+  },
+  exportUrl: (format: "csv" | "xlsx") => `/api/export?format=${format}`,
+  templateUrl: "/api/template.csv",
 };

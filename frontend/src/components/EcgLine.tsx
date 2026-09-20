@@ -1,9 +1,8 @@
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useCabinet } from "@/context/Cabinet";
+import { BPM, heartClock } from "@/lib/heartClock";
 import type { HeartMood } from "@/lib/types";
-
-const BPM: Record<HeartMood, number> = { idle: 62, contract: 96, expand: 44, warn: 128 };
 
 function gauss(x: number, mu: number, sigma: number): number {
   const d = (x - mu) / sigma;
@@ -58,7 +57,6 @@ export function EcgLine({
     let dpr = 1;
     let samples: Float32Array = new Float32Array(0);
     let head = 0;
-    let beatTime = 0;
     let last = performance.now();
     let frame = 0;
 
@@ -96,12 +94,12 @@ export function EcgLine({
       const advance = reduced ? 0 : dt * pxPerSecond;
       const from = head;
       head += advance;
-      beatTime += dt * (bpm / 60);
+      const beats = heartClock.update(bpm, now);
       const gap = Math.max(8, width * 0.04);
 
       // Nouveaux échantillons entre l'ancienne et la nouvelle tête de balayage.
       for (let x = Math.floor(from); x < Math.floor(head); x++) {
-        const phase = (beatTime - ((Math.floor(head) - x) / pxPerSecond) * (bpm / 60)) % 1;
+        const phase = (beats - ((Math.floor(head) - x) / pxPerSecond) * (bpm / 60)) % 1;
         const value = pqrst(phase < 0 ? phase + 1 : phase) + (Math.random() - 0.5) * 0.01;
         samples[x % width] = value;
       }

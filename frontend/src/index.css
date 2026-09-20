@@ -190,6 +190,24 @@
   .text-balance { text-wrap: balance; }
 }
 
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-ticket,
+  .print-ticket * {
+    visibility: visible;
+  }
+  .print-ticket {
+    position: fixed;
+    inset: 0;
+    margin: 0 auto;
+    max-width: 480px;
+    background: #fff !important;
+    color: #111 !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

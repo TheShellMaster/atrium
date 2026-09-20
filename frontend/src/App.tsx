@@ -10,6 +10,8 @@ import { Exam } from "@/pages/Exam";
 import { Lexicon } from "@/pages/Lexicon";
 import { Model } from "@/pages/Model";
 import { Patients } from "@/pages/Patients";
+import { StatsPage } from "@/pages/StatsPage";
+import { Docs } from "@/pages/Docs";
 
 export function App() {
   return (
@@ -22,8 +24,10 @@ export function App() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/examen" element={<Exam />} />
                 <Route path="/modele" element={<Model />} />
+                <Route path="/statistiques" element={<StatsPage />} />
                 <Route path="/patients" element={<Patients />} />
                 <Route path="/lexique" element={<Lexicon />} />
+                <Route path="/documentation" element={<Docs />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </AppShell>

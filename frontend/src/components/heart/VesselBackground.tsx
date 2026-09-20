@@ -92,6 +92,45 @@ function buildNetwork(seed: number, trunks: number, cx: number, cy: number, reac
 const SPEED: Record<HeartMood, number> = { idle: 1, contract: 1.7, expand: 0.65, warn: 2.4 };
 const BPM: Record<HeartMood, number> = { idle: 62, contract: 96, expand: 44, warn: 128 };
 
+const smooth = (t: number) => {
+  const c = Math.min(1, Math.max(0, t));
+  return c * c * (3 - 2 * c);
+};
+
+/** Lobe pulmonaire stylisé centré en (x, y), miroir pour le côté droit. */
+function lungLobe(x: number, y: number, mirror: boolean): string {
+  const m = mirror ? -1 : 1;
+  const p = (dx: number, dy: number) => `${(x + dx * m).toFixed(1)} ${(y + dy).toFixed(1)}`;
+  return [
+    `M ${p(20, -95)}`,
+    `C ${p(-40, -100)}, ${p(-95, -40)}, ${p(-92, 30)}`,
+    `C ${p(-90, 80)}, ${p(-55, 105)}, ${p(-5, 98)}`,
+    `C ${p(30, 92)}, ${p(38, 60)}, ${p(34, 20)}`,
+    `C ${p(30, -20)}, ${p(28, -60)}, ${p(20, -95)} Z`,
+  ].join(" ");
+}
+
+/** Vaisseaux qui descendent du cœur vers les deux poumons (artères et veines pulmonaires). */
+function descent(cx: number, cy: number, reach: number): { vessels: Vessel[]; lungs: { left: string; right: string; y: number } } {
+  const rand = rng(31);
+  const ly = cy + 210 * reach;
+  const lobes = [cx - 185 * reach, cx + 185 * reach];
+  const vessels: Vessel[] = [];
+  lobes.forEach((lx, side) => {
+    const dir = side === 0 ? -1 : 1;
+    for (let k = 0; k < 3; k++) {
+      const kind: Vessel["kind"] = k === 1 ? "vein" : "artery";
+      const start: [number, number] = [cx + dir * (18 + k * 14) * reach, cy + (62 + k * 10) * reach];
+      const end: [number, number] = [lx + dir * (k - 1) * 28 * reach + (rand() - 0.5) * 20, ly + (k - 1) * 30 * reach + (rand() - 0.5) * 24];
+      const c1: [number, number] = [start[0] + dir * 30 * reach, start[1] + 70 * reach];
+      const c2: [number, number] = [end[0] - dir * 60 * reach, end[1] - 90 * reach];
+      const d = `M ${start[0].toFixed(1)} ${start[1].toFixed(1)} C ${c1[0].toFixed(1)} ${c1[1].toFixed(1)}, ${c2[0].toFixed(1)} ${c2[1].toFixed(1)}, ${end[0].toFixed(1)} ${end[1].toFixed(1)}`;
+      vessels.push({ d, kind, width: 2.2 + (k === 1 ? 1.2 : 0.6), cells: 4, duration: 6 + rand() * 2 });
+    }
+  });
+  return { vessels, lungs: { left: lungLobe(lobes[0], ly, false), right: lungLobe(lobes[1], ly, true), y: ly } };
+}
+
 /**
  * Arrière-plan vasculaire : artères (rouge) et veines (violet) qui partent du cœur,
  * globules qui circulent le long des vaisseaux (offset-path), pulsation au rythme cardiaque.
@@ -103,6 +142,7 @@ export function VesselBackground({
   intensity = 1,
   center = [0.5, 0.5],
   reach = 1,
+  grow,
 }: {
   className?: string;
   seed?: number;
@@ -112,12 +152,17 @@ export function VesselBackground({
   center?: [number, number];
   /** Étirement du réseau (1 = cadre 1000×600). */
   reach?: number;
+  /** Progression du défilement : les vaisseaux descendent vers les poumons (0..1). */
+  grow?: number;
 }) {
   const { mood } = useCabinet();
   const uid = useId().replace(/:/g, "");
   const CX = W * center[0];
   const CY = H * center[1];
   const vessels = useMemo(() => buildNetwork(seed, trunks, CX, CY, reach), [seed, trunks, CX, CY, reach]);
+  const down = useMemo(() => (grow === undefined ? null : descent(CX, CY, reach)), [grow === undefined, CX, CY, reach]);
+  const g = smooth(grow ?? 0);
+  const lungsOpacity = smooth(((grow ?? 0) - 0.3) / 0.5);
 
   return (
     <div
@@ -177,6 +222,79 @@ export function VesselBackground({
             />
           ))}
         </g>
+
+        {down ? (
+          <g style={{ transform: `translateY(${(-g * 70).toFixed(1)}px)`, transition: "transform 120ms linear" }}>
+            <g style={{ opacity: lungsOpacity, transition: "opacity 200ms linear" }}>
+              {[down.lungs.left, down.lungs.right].map((d, i) => (
+                <path
+                  key={`lung${i}`}
+                  d={d}
+                  fill="var(--color-chart-5)"
+                  fillOpacity="0.07"
+                  stroke="var(--color-chart-5)"
+                  strokeOpacity="0.45"
+                  strokeWidth="1.6"
+                />
+              ))}
+              <text
+                x={CX}
+                y={down.lungs.y + 125 * reach}
+                textAnchor="middle"
+                className="fill-muted-foreground"
+                fontSize="13"
+                opacity="0.8"
+              >
+                poumons · échanges gazeux
+              </text>
+            </g>
+            <g filter={`url(#glow-${uid})`} opacity="0.3">
+              {down.vessels.map((v, i) => (
+                <path
+                  key={`dg${i}`}
+                  d={v.d}
+                  pathLength={1}
+                  fill="none"
+                  stroke={v.kind === "artery" ? "var(--color-risk)" : "var(--color-chart-5)"}
+                  strokeWidth={v.width * 2.4}
+                  strokeLinecap="round"
+                  style={{ strokeDasharray: 1, strokeDashoffset: 1 - g }}
+                />
+              ))}
+            </g>
+            {down.vessels.map((v, i) => (
+              <path
+                key={`dv${i}`}
+                d={v.d}
+                pathLength={1}
+                fill="none"
+                stroke={v.kind === "artery" ? "var(--color-risk)" : "var(--color-chart-5)"}
+                strokeWidth={v.width}
+                strokeLinecap="round"
+                opacity={v.kind === "artery" ? 0.6 : 0.45}
+                style={{ strokeDasharray: 1, strokeDashoffset: 1 - g }}
+              />
+            ))}
+            <g style={{ opacity: g > 0.9 ? 1 : 0, transition: "opacity 600ms ease" }}>
+              {down.vessels.map((v, i) =>
+                Array.from({ length: v.cells }, (_, c) => (
+                  <circle
+                    key={`dc${i}-${c}`}
+                    r={Math.max(1.4, v.width * 0.42)}
+                    fill={v.kind === "artery" ? "oklch(0.82 0.18 22)" : "oklch(0.8 0.1 300)"}
+                    style={{
+                      offsetPath: `path("${v.d}")`,
+                      offsetRotate: "0deg",
+                      animation: `flow calc(${v.duration}s / var(--flow-speed)) linear infinite`,
+                      animationDelay: `${(-(c / v.cells) * v.duration).toFixed(2)}s`,
+                      animationDirection: v.kind === "vein" ? "reverse" : "normal",
+                    }}
+                  />
+                )),
+              )}
+            </g>
+          </g>
+        ) : null}
 
         {vessels.map((v, i) =>
           Array.from({ length: v.cells }, (_, c) => (

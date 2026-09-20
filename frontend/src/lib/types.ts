@@ -62,9 +62,87 @@ export type ModelCard = {
   intercept: number;
   coefficients: { name: string; coef: number }[];
   roc: { fpr: number[]; tpr: number[]; auc: number };
+  sigmoid: { curve: { z: number; p: number }[]; patients: { z: number; p: number; y: number }[] };
+  sources: SourceSummary[];
+  missing: Record<string, number>;
   dataset: string;
   notes: string;
-  preview: Record<string, number>[];
+  preview: Record<string, number | string | null>[];
+  storage: { supabase: boolean; sqlite: string };
+};
+
+export type SourceSummary = {
+  source: string;
+  label: string;
+  n: number;
+  positive_rate: number;
+  missing_rate: number;
+};
+
+export type NumericStat = {
+  feature: string;
+  label: string;
+  unit: string;
+  count: number;
+  mean: number;
+  std: number;
+  min: number;
+  q25: number;
+  median: number;
+  q75: number;
+  max: number;
+  missing: number;
+  histogram: { bin: string; start: number; count: number }[];
+  by_target: { atteint: number; preserve: number };
+};
+
+export type Stats = {
+  n: number;
+  sources: SourceSummary[];
+  target: { atteint: number; preserve: number; rate: number };
+  numeric: NumericStat[];
+  categorical: {
+    feature: string;
+    label: string;
+    levels: { code: number; label: string; count: number; positive_rate: number }[];
+  }[];
+  correlations: { feature: string; label: string; r: number }[];
+  matrix: { columns: string[]; cells: { x: string; y: string; r: number }[] };
+};
+
+export type Regression = {
+  x: string;
+  y: string;
+  x_label: string;
+  y_label: string;
+  x_unit: string;
+  y_unit: string;
+  slope: number;
+  intercept: number;
+  r: number;
+  r2: number;
+  rmse: number;
+  n: number;
+  points: { x: number; y: number; target: number }[];
+  line: { x: number; y: number }[];
+  equation: string;
+};
+
+export type ImportResult = {
+  filename: string;
+  rows: number;
+  saved: number;
+  positives: number;
+  accuracy: number | null;
+  items: {
+    full_name: string | null;
+    features: Record<string, number>;
+    probability: number;
+    label: number;
+    risk: string;
+    actual_label: number | null;
+    store?: string;
+  }[];
   storage: { supabase: boolean; sqlite: string };
 };
 
@@ -74,8 +152,19 @@ export type PatientRow = {
   full_name?: string | null;
   age: number;
   sex: number;
-  predicted_label?: number | null;
-  predicted_proba?: number | null;
-  cholesterol?: number;
+  chest_pain?: number;
   resting_bp?: number;
+  cholesterol?: number;
+  fasting_bs?: number;
+  rest_ecg?: number;
+  max_hr?: number;
+  exercise_angina?: number;
+  oldpeak?: number | string;
+  slope?: number;
+  ca?: number;
+  thal?: number;
+  predicted_label?: number | null;
+  predicted_proba?: number | string | null;
+  actual_label?: number | null;
+  notes?: string | null;
 };

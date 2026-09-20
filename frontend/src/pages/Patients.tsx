@@ -1,7 +1,21 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { CloudIcon, DatabaseIcon, RefreshCwIcon, SearchIcon, StethoscopeIcon, UsersIcon, ActivityIcon, HeartPulseIcon } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  ActivityIcon,
+  CloudIcon,
+  DatabaseIcon,
+  DownloadIcon,
+  FileSpreadsheetIcon,
+  HeartPulseIcon,
+  ReceiptTextIcon,
+  RefreshCwIcon,
+  SearchIcon,
+  StethoscopeIcon,
+  UploadIcon,
+  UsersIcon,
+} from "lucide-react";
+import { toast } from "sonner";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -10,12 +24,23 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
+import { MedTerm } from "@/components/MedTerm";
+import { TicketDialog, ticketFromRow } from "@/components/ConsultationTicket";
 import { Reveal, RevealGroup, RevealItem } from "@/components/Reveal";
 import { api } from "@/lib/api";
 import { dateFr, pct } from "@/lib/format";
-import type { PatientRow } from "@/lib/types";
+import type { ImportResult, PatientRow } from "@/lib/types";
 
 type Filter = "all" | "positive" | "negative";
 
@@ -26,6 +51,9 @@ export function Patients() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [busy, setBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [imported, setImported] = useState<ImportResult | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
     setBusy(true);
@@ -41,6 +69,24 @@ export function Patients() {
   }, []);
 
   useEffect(load, [load]);
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    setImporting(true);
+    try {
+      const result = await api.importFile(file, true);
+      setImported(result);
+      toast.success(`${result.rows} patients importés`, {
+        description: `${result.positives} lus « atteint »${result.accuracy !== null ? ` · exactitude ${pct(result.accuracy)}` : ""}`,
+      });
+      load();
+    } catch (err) {
+      toast.error("Import impossible", { description: err instanceof Error ? err.message : undefined });
+    } finally {
+      setImporting(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  };
 
   const visible = useMemo(() => {
     if (!rows) return [];
@@ -62,10 +108,22 @@ export function Patients() {
 
   return (
     <>
+      <input
+        ref={fileInput}
+        type="file"
+        accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        className="hidden"
+        onChange={(e) => onFile(e.target.files?.[0])}
+      />
       <Reveal>
         <PageHeader
           title="Registre des patients"
-          description="Chaque examen est une ligne dans la base de données : c'est exactement le rôle de Supabase dans le projet."
+          description={
+            <>
+              Chaque examen est une ligne dans <MedTerm id="supabase">Supabase</MedTerm>. Importe un fichier{" "}
+              <MedTerm id="csv">CSV ou Excel</MedTerm> pour prédire en lot, exporte le registre pour l'analyser ailleurs.
+            </>
+          }
           actions={
             <>
               {cloud !== null ? (
@@ -74,9 +132,46 @@ export function Patients() {
                   {cloud ? "Supabase connecté" : "SQLite local"}
                 </Badge>
               ) : null}
-              <Button variant="outline" size="sm" onClick={load} disabled={busy}>
-                <RefreshCwIcon data-icon="inline-start" className={busy ? "animate-spin" : undefined} />
-                Actualiser
+              <Button variant="outline" size="sm" onClick={() => fileInput.current?.click()} disabled={importing}>
+                <UploadIcon data-icon="inline-start" />
+                {importing ? "Import…" : "Importer CSV / Excel"}
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <DownloadIcon data-icon="inline-start" />
+                    Exporter
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>Registre complet</DropdownMenuLabel>
+                    <DropdownMenuItem asChild>
+                      <a href={api.exportUrl("csv")} download>
+                        <FileSpreadsheetIcon />
+                        Fichier CSV
+                      </a>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <a href={api.exportUrl("xlsx")} download>
+                        <FileSpreadsheetIcon />
+                        Classeur Excel (patients + modèle)
+                      </a>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem asChild>
+                      <a href={api.templateUrl} download>
+                        <DownloadIcon />
+                        Modèle de fichier d'import
+                      </a>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button variant="ghost" size="sm" onClick={load} disabled={busy} aria-label="Actualiser">
+                <RefreshCwIcon className={busy ? "animate-spin" : undefined} />
               </Button>
               <Button size="sm" asChild>
                 <Link to="/examen">
@@ -115,6 +210,55 @@ export function Patients() {
           />
         </RevealItem>
       </RevealGroup>
+
+      {imported ? (
+        <Reveal>
+          <Card>
+            <CardHeader>
+              <CardTitle>Import « {imported.filename} »</CardTitle>
+              <CardDescription>
+                {imported.rows} lignes lues, {imported.saved} enregistrées, {imported.positives} lues « atteint »
+                {imported.accuracy !== null ? ` · exactitude sur les diagnostics fournis : ${pct(imported.accuracy)}` : ""}.
+              </CardDescription>
+              <CardAction>
+                <Button variant="ghost" size="sm" onClick={() => setImported(null)}>
+                  Fermer
+                </Button>
+              </CardAction>
+            </CardHeader>
+            <CardContent>
+              <div className="max-h-72 overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Dossier</TableHead>
+                      <TableHead>Âge</TableHead>
+                      <TableHead>Lecture</TableHead>
+                      <TableHead className="text-right">Probabilité</TableHead>
+                      <TableHead className="text-right">Diagnostic fourni</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {imported.items.map((item, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="font-medium">{item.full_name || `Ligne ${i + 1}`}</TableCell>
+                        <TableCell className="tabular-nums">{item.features.age}</TableCell>
+                        <TableCell>
+                          <Badge variant={item.label === 1 ? "destructive" : "secondary"}>{item.label === 1 ? "Atteint" : "Préservé"}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{pct(item.probability)}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {item.actual_label === null ? "—" : item.actual_label === 1 ? "atteint" : "préservé"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </Reveal>
+      ) : null}
 
       <Reveal delay={0.15}>
         <Card>
@@ -172,6 +316,7 @@ export function Patients() {
                       <TableHead>Lecture</TableHead>
                       <TableHead className="min-w-44">Probabilité</TableHead>
                       <TableHead className="text-right">Date</TableHead>
+                      <TableHead className="text-right">Ticket</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -196,6 +341,16 @@ export function Patients() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right text-muted-foreground">{dateFr(row.created_at)}</TableCell>
+                          <TableCell className="text-right">
+                            <TicketDialog
+                              data={ticketFromRow(row)}
+                              trigger={
+                                <Button variant="ghost" size="icon" aria-label={`Ticket de ${row.full_name || "ce dossier"}`}>
+                                  <ReceiptTextIcon />
+                                </Button>
+                              }
+                            />
+                          </TableCell>
                         </TableRow>
                       );
                     })}
