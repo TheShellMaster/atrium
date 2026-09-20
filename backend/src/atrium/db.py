@@ -248,9 +248,17 @@ def save_prediction(row: dict[str, Any]) -> dict[str, Any]:
     return {**payload, "store": "sqlite"}
 
 
-def storage_status() -> dict[str, Any]:
+_status_cache: dict[str, Any] = {"at": 0.0, "value": None}
+
+
+def storage_status(max_age: float = 60.0) -> dict[str, Any]:
+    """État du stockage, mis en cache pour ne pas ralentir chaque page."""
+    import time
+
+    now = time.monotonic()
+    if _status_cache["value"] is not None and now - _status_cache["at"] < max_age:
+        return _status_cache["value"]
     remote = _supabase_select("patients", "select=id&limit=1")
-    return {
-        "supabase": remote is not None,
-        "sqlite": str(SQLITE_PATH),
-    }
+    value = {"supabase": remote is not None, "sqlite": str(SQLITE_PATH)}
+    _status_cache.update(at=now, value=value)
+    return value

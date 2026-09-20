@@ -1,11 +1,12 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { api } from "../lib/api";
-import type { Catalog, ModelCard } from "../lib/types";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { api } from "@/lib/api";
+import type { Catalog, ModelCard } from "@/lib/types";
 
 type DataValue = {
   catalog: Catalog | null;
   model: ModelCard | null;
   error: string | null;
+  loading: boolean;
   reload: () => void;
 };
 
@@ -15,29 +16,34 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [model, setModel] = useState<ModelCard | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const reload = () => {
+  const reload = useCallback(() => {
+    setLoading(true);
     Promise.all([api.catalog(), api.model()])
       .then(([c, m]) => {
         setCatalog(c);
         setModel(m);
         setError(null);
       })
-      .catch((err: Error) => setError(err.message));
-  };
+      .catch((err: Error) => setError(err.message || "API injoignable"))
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     reload();
-    const again = window.setTimeout(reload, 1200);
-    return () => window.clearTimeout(again);
-  }, []);
+    const retry = window.setTimeout(reload, 1500);
+    return () => window.clearTimeout(retry);
+  }, [reload]);
 
-  return <DataContext.Provider value={{ catalog, model, error, reload }}>{children}</DataContext.Provider>;
+  return (
+    <DataContext.Provider value={{ catalog, model, error, loading, reload }}>{children}</DataContext.Provider>
+  );
 }
 
 export function useData() {
   const ctx = useContext(DataContext);
-  if (!ctx) throw new Error("Données manquantes");
+  if (!ctx) throw new Error("DataProvider manquant");
   return ctx;
 }
 
