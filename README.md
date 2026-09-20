@@ -32,26 +32,23 @@ Le modèle s'entraîne tout seul au premier démarrage. Les clés Supabase se me
 
 ## Héberger gratuitement
 
-GitHub Pages n'héberge que du statique : l'API Python (scikit-learn) ne peut pas y tourner. Deux options gratuites qui marchent :
+GitHub Pages n'héberge que du statique : l'API Python (scikit-learn) ne peut pas y tourner. Le `Dockerfile` à la racine construit l'interface et la sert avec l'API sur le même domaine.
 
-### Option A — tout-en-un sur un Space Hugging Face (recommandé)
+### Option A — tout-en-un sur Render (recommandé, gratuit, sans carte)
 
-Le `Dockerfile` construit l'interface et la sert avec l'API sur le même domaine (`https://<compte>-atrium.hf.space`).
+`render.yaml` décrit le service. Sur https://dashboard.render.com : **New → Blueprint**, choisir le dépôt GitHub `atrium` (autoriser l'accès au dépôt privé), Render lit `render.yaml` ; renseigner les deux secrets `SUPABASE_URL` et `SUPABASE_ANON_KEY` (valeurs de `.env`) puis **Apply**. Première construction : 5 à 8 minutes. URL du type `https://atrium.onrender.com`.
 
-```bash
-uvx --from huggingface_hub hf auth login   # une fois : colle un jeton « write » (huggingface.co/settings/tokens)
-uv run scripts/deploy_space.py             # crée le Space, copie les secrets Supabase depuis .env, envoie le code
-```
+Le plan gratuit met le service en veille après 15 minutes sans visite (premier chargement ensuite : 30 à 60 s). Pour une présentation, ouvrir le site quelques minutes avant, ou programmer un ping gratuit de `/api/health` toutes les 10 minutes (par exemple https://cron-job.org).
 
-Le script affiche l'URL du Space et celle de l'application (`https://<compte>-atrium.hf.space`). La première construction prend 3 à 5 minutes ; ensuite chaque `uv run scripts/deploy_space.py` redéploie. Rafraîchir n'importe quelle page garde la page (l'API renvoie l'interface pour toutes les routes non-API).
+### Option B — frontend sur Vercel, API sur Render
 
-### Option B — frontend sur Vercel, API sur le Space
+1. Déployer l'API avec l'option A.
+2. Sur https://vercel.com/new, importer le dépôt, **Root Directory = `frontend`**, framework Vite, variable `VITE_API_URL=https://atrium.onrender.com`.
+3. Côté API, variable `ATRIUM_CORS_ORIGINS=https://<projet>.vercel.app` (les `*.vercel.app` sont déjà acceptés). `frontend/vercel.json` contient la réécriture SPA.
 
-1. Déploie d'abord l'API avec l'option A (ou tout autre hébergeur de conteneurs : Render, Fly.io, Railway).
-2. Sur https://vercel.com/new, importe le dépôt GitHub, **Root Directory = `frontend`**, framework Vite (détecté), variable d'environnement `VITE_API_URL=https://<compte>-atrium.hf.space`.
-3. Côté API, autorise le domaine Vercel : variable `ATRIUM_CORS_ORIGINS=https://atrium.vercel.app` (les `*.vercel.app` sont déjà acceptés).
+### Hugging Face
 
-`frontend/vercel.json` contient la réécriture SPA : un rafraîchissement sur `/modele` reste sur `/modele`.
+Les Spaces Docker ne sont plus gratuits (abonnement PRO requis) ; `scripts/deploy_space.py` reste disponible pour un compte PRO : `uv run scripts/deploy_space.py`.
 
 ## Ce que fait le modèle
 
