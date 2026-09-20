@@ -38,18 +38,12 @@ GitHub Pages n'héberge que du statique : l'API Python (scikit-learn) ne peut pa
 
 Le `Dockerfile` construit l'interface et la sert avec l'API sur le même domaine (`https://<compte>-atrium.hf.space`).
 
-1. Crée un Space sur https://huggingface.co/new-space : nom `atrium`, SDK **Docker**, visibilité publique, matériel CPU basic (gratuit).
-2. Dans *Settings → Variables and secrets* du Space, ajoute les secrets `SUPABASE_URL` et `SUPABASE_ANON_KEY` (valeurs de `.env`).
-3. Pousse le dépôt vers le Space :
-
 ```bash
-pip install -U huggingface_hub
-hf auth login                                   # colle un token « write »
-git remote add hf https://huggingface.co/spaces/<compte>/atrium
-git push hf master:main
+uvx --from huggingface_hub hf auth login   # une fois : colle un jeton « write » (huggingface.co/settings/tokens)
+uv run scripts/deploy_space.py             # crée le Space, copie les secrets Supabase depuis .env, envoie le code
 ```
 
-Le Space construit l'image (3–4 min) puis l'application est en ligne. Rafraîchir n'importe quelle page garde la page (l'API renvoie l'interface pour toutes les routes non-API).
+Le script affiche l'URL du Space et celle de l'application (`https://<compte>-atrium.hf.space`). La première construction prend 3 à 5 minutes ; ensuite chaque `uv run scripts/deploy_space.py` redéploie. Rafraîchir n'importe quelle page garde la page (l'API renvoie l'interface pour toutes les routes non-API).
 
 ### Option B — frontend sur Vercel, API sur le Space
 
