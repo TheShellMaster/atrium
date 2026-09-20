@@ -7,4 +7,3 @@ backend/data/atrium.db
 backend/models/*.joblib
 backend/models/*.json
 .env
-tools
