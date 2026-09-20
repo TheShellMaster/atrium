@@ -13,6 +13,7 @@ license: cc-by-4.0
 
 Application web de prédiction du risque cardiovasculaire : régression logistique Python entraînée sur 918 patients réels (UCI, 4 hôpitaux), registre Supabase, interface dashboard shadcn/ui avec cœur anatomique 3D translucide, réseau vasculaire animé, ECG de moniteur, sons, lexique et documentation intégrés.
 
+- **Site en ligne : https://atrium-xscu.onrender.com** (Render, plan gratuit : première ouverture après une pause = 30 à 60 s de réveil)
 - Dépôt : https://github.com/TheShellMaster/atrium
 - Maquettes Figma (captures des écrans) : https://www.figma.com/design/nIvvsJEJQgtbKMdfRmMpOe
 - Documentation complète : page `/documentation` de l'application
