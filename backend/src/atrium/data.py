@@ -30,7 +30,38 @@ SOURCES = {
     "hungarian": "Institut de cardiologie de Budapest",
     "switzerland": "Hôpitaux universitaires de Zurich et Bâle",
     "va": "VA Medical Center, Long Beach (Californie)",
+    "atrium": "Registre Atrium (dossiers au diagnostic confirmé)",
 }
+
+# Colonnes du registre Supabase → variables du modèle.
+REGISTRY_COLUMNS = {
+    "age": "age",
+    "sex": "sex",
+    "chest_pain": "cp",
+    "resting_bp": "trestbps",
+    "cholesterol": "chol",
+    "fasting_bs": "fbs",
+    "rest_ecg": "restecg",
+    "max_hr": "thalach",
+    "exercise_angina": "exang",
+    "oldpeak": "oldpeak",
+    "slope": "slope",
+    "ca": "ca",
+    "thal": "thal",
+}
+
+
+def registry_frame(rows: list[dict]) -> pd.DataFrame:
+    """Dossiers du registre dont le diagnostic est confirmé, au format du jeu d'apprentissage."""
+    keep = [r for r in rows if r.get("actual_label") is not None]
+    if not keep:
+        return pd.DataFrame(columns=[*FEATURE_ORDER, "target", "source"])
+    frame = pd.DataFrame(keep).rename(columns=REGISTRY_COLUMNS)
+    for col in FEATURE_ORDER:
+        frame[col] = pd.to_numeric(frame.get(col), errors="coerce")
+    frame["target"] = pd.to_numeric(frame["actual_label"], errors="coerce").fillna(0).astype(int).clip(0, 1)
+    frame["source"] = "atrium"
+    return frame[[*FEATURE_ORDER, "target", "source"]].dropna(subset=["age", "sex", "cp"])
 CP_MAP = {1: 0, 2: 1, 3: 2, 4: 3}
 SLOPE_MAP = {1: 0, 2: 1, 3: 2}
 THAL_MAP = {3: 1, 6: 2, 7: 3}

@@ -32,6 +32,8 @@ export type Prediction = {
   patient?: Record<string, unknown> | null;
   features?: Record<string, number>;
   full_name?: string | null;
+  actual_label?: number | null;
+  learning?: boolean;
 };
 
 export type Catalog = {
@@ -65,6 +67,18 @@ export type ModelCard = {
   sigmoid: { curve: { z: number; p: number }[]; patients: { z: number; p: number; y: number }[] };
   sources: SourceSummary[];
   missing: Record<string, number>;
+  n_reference: number;
+  n_registry: number;
+  trained_at?: string;
+  cv?: {
+    folds: number;
+    accuracy_mean: number;
+    accuracy_std: number;
+    auc_mean: number;
+    auc_std: number;
+    recall_mean: number;
+    precision_mean: number;
+  };
   dataset: string;
   notes: string;
   preview: Record<string, number | string | null>[];
@@ -133,6 +147,8 @@ export type ImportResult = {
   rows: number;
   saved: number;
   positives: number;
+  confirmed?: number;
+  learning?: boolean;
   accuracy: number | null;
   items: {
     full_name: string | null;

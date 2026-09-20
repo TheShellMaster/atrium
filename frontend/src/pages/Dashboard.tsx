@@ -108,9 +108,11 @@ export function Dashboard() {
           title="Tableau de bord"
           description={
             <>
-              Lecture du risque cardiovasculaire sur {model?.n_total ?? "…"} patients réels (<MedTerm id="uci">UCI</MedTerm>, 4
-              hôpitaux). Une <MedTerm id="regression">régression logistique</MedTerm> transforme 13 variables cliniques en
-              probabilité d'accident.
+              Lecture du risque cardiovasculaire sur {model?.n_total ?? "…"} patients réels : {model?.n_reference ?? "…"} de
+              référence (<MedTerm id="uci">UCI</MedTerm>, 4 hôpitaux)
+              {model && model.n_registry > 0 ? ` + ${model.n_registry} dossier${model.n_registry > 1 ? "s" : ""} Atrium confirmé${model.n_registry > 1 ? "s" : ""}` : ""}
+              . Une <MedTerm id="regression">régression logistique</MedTerm> transforme 13 variables cliniques en probabilité
+              d'accident, et s'affine à chaque diagnostic confirmé.
             </>
           }
           actions={

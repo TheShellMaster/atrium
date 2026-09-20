@@ -3,6 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { AppShell } from "@/components/app-shell/AppShell";
+import { IntroSplash } from "@/components/IntroSplash";
 import { CabinetProvider } from "@/context/Cabinet";
 import { DataProvider } from "@/context/Data";
 import { Dashboard } from "@/pages/Dashboard";
@@ -31,6 +32,7 @@ export function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </AppShell>
+            <IntroSplash />
             <Toaster richColors position="bottom-right" />
           </DataProvider>
         </CabinetProvider>

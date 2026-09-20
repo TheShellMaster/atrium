@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     data_dir: Path = ROOT / "data"
     models_dir: Path = ROOT / "models"
     threshold: float = 0.5
+    # Origines autorisées (CORS), séparées par des virgules. Vide = localhost uniquement.
+    atrium_cors_origins: str = ""
+    # Dossier du frontend construit à servir (image Docker / Space Hugging Face).
+    atrium_static_dir: str = ""
     dataset_url: str = (
         "https://raw.githubusercontent.com/kb22/Heart-Disease-Prediction/master/dataset.csv"
     )

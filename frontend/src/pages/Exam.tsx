@@ -58,10 +58,11 @@ const chartConfig: ChartConfig = {
 };
 
 export function Exam() {
-  const { catalog } = useData();
+  const { catalog, reload } = useData();
   const { setMood } = useCabinet();
   const [values, setValues] = useState<Record<string, number>>({});
   const [name, setName] = useState("");
+  const [diagnosis, setDiagnosis] = useState<"unknown" | "0" | "1">("unknown");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Prediction | null>(null);
@@ -92,6 +93,7 @@ export function Exam() {
   const reset = () => {
     setValues(catalog.defaults);
     setName("");
+    setDiagnosis("unknown");
     setResult(null);
     setError(null);
     setMood("idle");
@@ -108,7 +110,13 @@ export function Exam() {
     setBusy(true);
     setError(null);
     try {
-      const prediction = await api.predict({ ...catalog.defaults, ...values, full_name: name || null, persist: true });
+      const prediction = await api.predict({
+        ...catalog.defaults,
+        ...values,
+        full_name: name || null,
+        persist: true,
+        actual_label: diagnosis === "unknown" ? null : Number(diagnosis),
+      });
       setResult(prediction);
       setMood(prediction.label === 1 ? "warn" : "expand");
       audio.chime(prediction.label === 1 ? "risk" : "safe");
@@ -116,6 +124,12 @@ export function Exam() {
       toast.success(`Dossier enregistré dans ${store}`, {
         description: `Probabilité ${(prediction.probability * 100).toFixed(1)} % · risque ${prediction.risk}`,
       });
+      if (prediction.learning) {
+        toast.info("Le modèle apprend de ce dossier", {
+          description: "Diagnostic confirmé : ré-entraînement en cours, les comptes et les métriques se mettent à jour.",
+        });
+        window.setTimeout(reload, 8000);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Prédiction impossible");
     } finally {
@@ -166,11 +180,37 @@ export function Exam() {
             <CardContent>
               <form id="exam-form" onSubmit={submit}>
                 <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="full_name">Nom du dossier</FieldLabel>
-                    <Input id="full_name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Patient 14" />
-                    <FieldDescription>Optionnel. Sert à retrouver le dossier dans le registre.</FieldDescription>
-                  </Field>
+                  <div className="grid gap-5 md:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="full_name">Nom du dossier</FieldLabel>
+                      <Input id="full_name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Patient 14" />
+                      <FieldDescription>Optionnel. Sert à retrouver le dossier dans le registre.</FieldDescription>
+                    </Field>
+                    <Field>
+                      <FieldLabel>Diagnostic réel, si connu</FieldLabel>
+                      <ToggleGroup
+                        type="single"
+                        variant="outline"
+                        value={diagnosis}
+                        onValueChange={(v) => v && setDiagnosis(v as typeof diagnosis)}
+                        className="w-full"
+                      >
+                        <ToggleGroupItem value="unknown" className="flex-1">
+                          Inconnu
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="0" className="flex-1">
+                          Préservé
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="1" className="flex-1">
+                          Atteint
+                        </ToggleGroupItem>
+                      </ToggleGroup>
+                      <FieldDescription>
+                        Si le diagnostic est confirmé, le dossier rejoint l'<MedTerm id="train_test">apprentissage</MedTerm> : le
+                        modèle se ré-entraîne et les comptes augmentent.
+                      </FieldDescription>
+                    </Field>
+                  </div>
 
                   {GROUPS.map((group) => (
                     <FieldSet key={group.legend}>
@@ -352,10 +392,13 @@ export function Exam() {
             </CardContent>
             {result ? (
               <CardFooter className="flex-wrap justify-between gap-2 text-xs">
-                <Badge variant={result.patient?.store === "supabase" ? "default" : "secondary"} className="gap-1.5">
-                  {result.patient?.store === "supabase" ? <CloudIcon /> : <DatabaseIcon />}
-                  {result.patient?.store === "supabase" ? "Enregistré dans Supabase" : "Copie locale"}
-                </Badge>
+                <div className="flex flex-wrap gap-1.5">
+                  <Badge variant={result.patient?.store === "supabase" ? "default" : "secondary"} className="gap-1.5">
+                    {result.patient?.store === "supabase" ? <CloudIcon /> : <DatabaseIcon />}
+                    {result.patient?.store === "supabase" ? "Enregistré dans Supabase" : "Hors-ligne : copie locale"}
+                  </Badge>
+                  {result.learning ? <Badge variant="outline">Utilisé pour l'apprentissage</Badge> : null}
+                </div>
                 <TicketDialog data={ticketFromPrediction(result)} />
               </CardFooter>
             ) : null}

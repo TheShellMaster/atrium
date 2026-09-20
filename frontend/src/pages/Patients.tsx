@@ -127,9 +127,9 @@ export function Patients() {
           actions={
             <>
               {cloud !== null ? (
-                <Badge variant={cloud ? "default" : "secondary"} className="gap-1.5">
+                <Badge variant={cloud ? "default" : "destructive"} className="gap-1.5">
                   {cloud ? <CloudIcon /> : <DatabaseIcon />}
-                  {cloud ? "Supabase connecté" : "SQLite local"}
+                  {cloud ? "Supabase connecté" : "Supabase injoignable"}
                 </Badge>
               ) : null}
               <Button variant="outline" size="sm" onClick={() => fileInput.current?.click()} disabled={importing}>

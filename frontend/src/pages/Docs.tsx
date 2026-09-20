@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { MedTerm } from "@/components/MedTerm";
 import { Reveal, RevealGroup, RevealItem } from "@/components/Reveal";
 import { useData } from "@/context/Data";
+import { api } from "@/lib/api";
 import { num, pct } from "@/lib/format";
 
 const ENDPOINTS = [
@@ -60,7 +61,7 @@ export function Docs() {
                 </a>
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <a href="http://127.0.0.1:8000/docs" target="_blank" rel="noreferrer">
+                <a href={api.docsUrl} target="_blank" rel="noreferrer">
                   Swagger de l'API
                   <ExternalLinkIcon data-icon="inline-end" />
                 </a>

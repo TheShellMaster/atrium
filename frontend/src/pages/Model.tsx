@@ -412,7 +412,15 @@ export function Model() {
 
       <RevealGroup className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <RevealItem>
-          <StatCard label="Exactitude" value={model.accuracy * 100} format={(v) => v.toFixed(1)} suffix="%" icon={TargetIcon} hint="(VP + VN) / total" badge={`F1 ${pct(model.f1)}`} />
+          <StatCard
+            label="Exactitude"
+            value={model.accuracy * 100}
+            format={(v) => v.toFixed(1)}
+            suffix="%"
+            icon={TargetIcon}
+            hint={model.cv ? `Validation croisée ${model.cv.folds} plis : ${pct(model.cv.accuracy_mean)} ± ${pct(model.cv.accuracy_std)}` : "(VP + VN) / total"}
+            badge={`F1 ${pct(model.f1)}`}
+          />
         </RevealItem>
         <RevealItem>
           <StatCard label="Précision" value={model.precision * 100} format={(v) => v.toFixed(1)} suffix="%" icon={ActivityIcon} hint="VP / (VP + FP)" />
@@ -421,9 +429,31 @@ export function Model() {
           <StatCard label="Sensibilité" value={model.recall * 100} format={(v) => v.toFixed(1)} suffix="%" icon={CrosshairIcon} tone="risk" hint="VP / (VP + FN) · rappel" />
         </RevealItem>
         <RevealItem>
-          <StatCard label="Spécificité" value={model.specificity * 100} format={(v) => v.toFixed(1)} suffix="%" icon={ShieldCheckIcon} tone="safe" hint="VN / (VN + FP)" badge={`AUC ${num(model.auc, 3)}`} />
+          <StatCard
+            label="Spécificité"
+            value={model.specificity * 100}
+            format={(v) => v.toFixed(1)}
+            suffix="%"
+            icon={ShieldCheckIcon}
+            tone="safe"
+            hint={model.cv ? `AUC en validation croisée : ${num(model.cv.auc_mean, 3)} ± ${num(model.cv.auc_std, 3)}` : "VN / (VN + FP)"}
+            badge={`AUC ${num(model.auc, 3)}`}
+          />
         </RevealItem>
       </RevealGroup>
+
+      <Reveal delay={0.1}>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <Badge variant="outline">{model.n_reference} patients de référence (UCI)</Badge>
+          <Badge variant={model.n_registry > 0 ? "default" : "outline"}>
+            {model.n_registry} dossier{model.n_registry > 1 ? "s" : ""} Atrium confirmé{model.n_registry > 1 ? "s" : ""} dans l'apprentissage
+          </Badge>
+          {model.trained_at ? <span>Dernier entraînement : {new Date(model.trained_at).toLocaleString("fr-FR")}</span> : null}
+          <span>
+            Chaque <MedTerm id="train_test">dossier confirmé</MedTerm> ré-entraîne le modèle : les comptes et les métriques s'affinent.
+          </span>
+        </div>
+      </Reveal>
 
       <Reveal delay={0.15}>
         <Tabs defaultValue="confusion" className="gap-4">

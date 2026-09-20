@@ -18,3 +18,5 @@ class PatientIn(BaseModel):
     thal: int = Field(ge=0, le=3)
     notes: str | None = None
     persist: bool = True
+    # Diagnostic réel si connu (0 préservé, 1 atteint) : le dossier rejoint alors l'apprentissage.
+    actual_label: int | None = Field(default=None, ge=0, le=1)

@@ -6,7 +6,8 @@ def test_descriptive_stats_shape() -> None:
     assert stats["n"] >= 900  # UCI, 4 hôpitaux
     assert stats["target"]["atteint"] + stats["target"]["preserve"] == stats["n"]
     assert {row["feature"] for row in stats["numeric"]} == {"age", "trestbps", "chol", "thalach", "oldpeak"}
-    assert {s["source"] for s in stats["sources"]} == {"cleveland", "hungarian", "switzerland", "va"}
+    # Les 4 hôpitaux UCI sont toujours là ; le registre Atrium s'ajoute quand des dossiers sont confirmés.
+    assert {"cleveland", "hungarian", "switzerland", "va"} <= {s["source"] for s in stats["sources"]}
 
 
 def test_linear_regression_age_thalach() -> None:

@@ -1,0 +1,10 @@
+.git
+node_modules
+frontend/node_modules
+frontend/dist
+backend/.venv
+backend/data/atrium.db
+backend/models/*.joblib
+backend/models/*.json
+.env
+tools

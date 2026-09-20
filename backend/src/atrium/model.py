@@ -10,12 +10,12 @@ from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold, cross_validate, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from atrium.config import settings
-from atrium.data import load_uci_dataset, source_summary
+from atrium.data import load_uci_dataset, registry_frame, source_summary
 from atrium.features import CATEGORICAL, FEATURE_META, FEATURE_ORDER, NUMERIC
 from atrium.metrics import from_predictions, pack, roc_points
 
@@ -44,9 +44,23 @@ def ensure_dataset() -> Path:
     return DATASET
 
 
-def load_dataset() -> pd.DataFrame:
-    """Jeu complet UCI (920 patients, 4 hôpitaux). Colonnes : features, target, source."""
-    return load_uci_dataset()
+def load_dataset(include_registry: bool = True) -> pd.DataFrame:
+    """Jeu d'apprentissage : UCI (4 hôpitaux) + dossiers Atrium au diagnostic confirmé.
+
+    Chaque patient confirmé dans le registre affine le modèle et fait grandir les comptes.
+    """
+    data = load_uci_dataset()
+    if not include_registry:
+        return data
+    try:
+        from atrium import db
+
+        extra = registry_frame(db.list_confirmed_patients())
+    except Exception:  # registre injoignable : on apprend sur la référence seule
+        extra = pd.DataFrame()
+    if extra.empty:
+        return data
+    return pd.concat([data, extra], ignore_index=True)
 
 
 def load_cleveland() -> pd.DataFrame:
@@ -92,9 +106,21 @@ def train(random_state: int = 42) -> dict:
     pred = (proba >= settings.threshold).astype(int)
     confusion = from_predictions(y_test.to_numpy(), pred)
     auc = float(roc_auc_score(y_test, proba))
+    # Validation croisée stratifiée 5 plis : chaque patient sert une fois de test → métriques stables.
+    folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_state)
+    cv = cross_validate(build_pipeline(), x, y, cv=folds, scoring=["accuracy", "roc_auc", "recall", "precision"])
     report = {
         "model_name": "regression_logistique",
         **pack(confusion, auc),
+        "cv": {
+            "folds": 5,
+            "accuracy_mean": float(cv["test_accuracy"].mean()),
+            "accuracy_std": float(cv["test_accuracy"].std()),
+            "auc_mean": float(cv["test_roc_auc"].mean()),
+            "auc_std": float(cv["test_roc_auc"].std()),
+            "recall_mean": float(cv["test_recall"].mean()),
+            "precision_mean": float(cv["test_precision"].mean()),
+        },
         "n_train": int(len(x_train)),
         "n_test": int(len(x_test)),
         "n_total": int(len(data)),
@@ -112,6 +138,9 @@ def train(random_state: int = 42) -> dict:
             ],
         },
         "dataset": f"{DATASET_LABEL}, {len(data)} patients réels",
+        "n_reference": int((data["source"] != "atrium").sum()),
+        "n_registry": int((data["source"] == "atrium").sum()),
+        "trained_at": __import__("datetime").datetime.now(__import__("datetime").UTC).isoformat(),
         "sources": source_summary(data),
         "missing": {
             col: float(data[col].isna().mean()) for col in FEATURE_ORDER if data[col].isna().any()
@@ -122,8 +151,26 @@ def train(random_state: int = 42) -> dict:
         ),
     }
     settings.models_dir.mkdir(parents=True, exist_ok=True)
-    joblib.dump(pipe, MODEL_PATH)
-    METRICS_PATH.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    # Écriture atomique : les requêtes en cours lisent toujours un modèle complet.
+    tmp_model = MODEL_PATH.with_suffix(".joblib.tmp")
+    joblib.dump(pipe, tmp_model)
+    tmp_model.replace(MODEL_PATH)
+    tmp_metrics = METRICS_PATH.with_suffix(".json.tmp")
+    tmp_metrics.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    tmp_metrics.replace(METRICS_PATH)
+    _model_cache.clear()
+    return report
+
+
+_model_cache: dict[str, object] = {}
+
+
+def refresh_from_registry() -> dict:
+    """Ré-entraîne avec les dossiers confirmés du registre et journalise les métriques."""
+    from atrium import db
+
+    report = train()
+    db.save_metrics(report)
     return report
 
 
@@ -153,7 +200,13 @@ def _short_name(name: str) -> str:
 def load_model() -> Pipeline:
     if not MODEL_PATH.exists():
         train()
-    return joblib.load(MODEL_PATH)
+    stamp = MODEL_PATH.stat().st_mtime
+    cached = _model_cache.get("pipe")
+    if cached is not None and _model_cache.get("stamp") == stamp:
+        return cached  # type: ignore[return-value]
+    pipe = joblib.load(MODEL_PATH)
+    _model_cache.update(pipe=pipe, stamp=stamp)
+    return pipe
 
 
 def load_metrics() -> dict:

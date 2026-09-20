@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import sqlite3
+import tempfile
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -12,9 +14,20 @@ from atrium.config import settings
 SQLITE_PATH = settings.data_dir / "atrium.db"
 
 
+def _sqlite_path() -> Path:
+    """Copie locale : dossier data si accessible en écriture, sinon /tmp (conteneurs en lecture seule)."""
+    try:
+        SQLITE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        probe = SQLITE_PATH.parent / ".write-test"
+        probe.touch()
+        probe.unlink()
+        return SQLITE_PATH
+    except OSError:
+        return Path(tempfile.gettempdir()) / "atrium.db"
+
+
 def _connect() -> sqlite3.Connection:
-    SQLITE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(SQLITE_PATH)
+    conn = sqlite3.connect(_sqlite_path())
     conn.row_factory = sqlite3.Row
     conn.execute(
         """
@@ -73,19 +86,28 @@ def _headers() -> dict[str, str] | None:
     }
 
 
+TIMEOUT = 20
+RETRIES = 2
+
+
 def _supabase_insert(table: str, payload: dict[str, Any]) -> dict[str, Any] | None:
+    """Insertion PostgREST ; Supabase est le stockage principal, on réessaie avant d'abandonner."""
     headers = _headers()
     if not headers:
         return None
     url = f"{settings.supabase_url}/rest/v1/{table}"
-    try:
-        response = httpx.post(url, headers=headers, json=payload, timeout=12)
-        if response.status_code >= 400:
-            return None
-        data = response.json()
-        return data[0] if isinstance(data, list) and data else data
-    except httpx.HTTPError:
-        return None
+    for attempt in range(RETRIES):
+        try:
+            response = httpx.post(url, headers=headers, json=payload, timeout=TIMEOUT)
+            if response.status_code < 400:
+                data = response.json()
+                return data[0] if isinstance(data, list) and data else data
+            if response.status_code < 500:
+                return None  # erreur de schéma ou de politique : inutile de réessayer
+        except httpx.HTTPError:
+            if attempt == RETRIES - 1:
+                return None
+    return None
 
 
 def _supabase_select(table: str, query: str) -> list[dict[str, Any]] | None:
@@ -93,14 +115,18 @@ def _supabase_select(table: str, query: str) -> list[dict[str, Any]] | None:
     if not headers:
         return None
     url = f"{settings.supabase_url}/rest/v1/{table}?{query}"
-    try:
-        response = httpx.get(url, headers=headers, timeout=12)
-        if response.status_code >= 400:
-            return None
-        data = response.json()
-        return data if isinstance(data, list) else None
-    except httpx.HTTPError:
-        return None
+    for attempt in range(RETRIES):
+        try:
+            response = httpx.get(url, headers=headers, timeout=TIMEOUT)
+            if response.status_code < 400:
+                data = response.json()
+                return data if isinstance(data, list) else None
+            if response.status_code < 500:
+                return None
+        except httpx.HTTPError:
+            if attempt == RETRIES - 1:
+                return None
+    return None
 
 
 def save_patient(row: dict[str, Any]) -> dict[str, Any]:
@@ -152,6 +178,22 @@ def list_patients(limit: int = 40) -> list[dict[str, Any]]:
     conn = _connect()
     rows = conn.execute(
         "select * from patients order by created_at desc limit ?", (limit,)
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def list_confirmed_patients(limit: int = 5000) -> list[dict[str, Any]]:
+    """Dossiers dont le diagnostic réel est renseigné : ils rejoignent l'apprentissage."""
+    remote = _supabase_select(
+        "patients", f"select=*&actual_label=not.is.null&order=created_at.asc&limit={limit}"
+    )
+    if remote is not None:
+        return remote
+    conn = _connect()
+    rows = conn.execute(
+        "select * from patients where actual_label is not null order by created_at asc limit ?",
+        (limit,),
     ).fetchall()
     conn.close()
     return [dict(row) for row in rows]
@@ -251,7 +293,7 @@ def save_prediction(row: dict[str, Any]) -> dict[str, Any]:
 _status_cache: dict[str, Any] = {"at": 0.0, "value": None}
 
 
-def storage_status(max_age: float = 60.0) -> dict[str, Any]:
+def storage_status(max_age: float = 30.0) -> dict[str, Any]:
     """État du stockage, mis en cache pour ne pas ralentir chaque page."""
     import time
 

@@ -5,16 +5,28 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 import pandas as pd
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, Response
 
+from pathlib import Path
+
+from fastapi.staticfiles import StaticFiles
+
 from atrium import db
 from atrium.analysis import descriptive_stats, frame_from_upload, linear_regression, template_csv
+from atrium.config import settings
 from atrium.features import CHOICES, DEFAULT_PATIENT, FEATURE_META, FEATURE_ORDER
 from atrium.lexicon import TERMS
 from atrium.metrics import FORMULAS
-from atrium.model import dataset_preview, load_metrics, predict_frame, predict_one, train
+from atrium.model import (
+    dataset_preview,
+    load_metrics,
+    predict_frame,
+    predict_one,
+    refresh_from_registry,
+    train,
+)
 from atrium.schemas import PatientIn
 
 
@@ -26,9 +38,13 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Atrium", version="1.0.0", lifespan=lifespan)
+_origins = ["http://127.0.0.1:5173", "http://localhost:5173"] + [
+    o.strip() for o in settings.atrium_cors_origins.split(",") if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
+    allow_origins=_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -68,11 +84,12 @@ def retrain() -> dict:
 
 
 @app.post("/api/predict")
-def predict(patient: PatientIn) -> dict:
+def predict(patient: PatientIn, background: BackgroundTasks) -> dict:
     features = patient.model_dump()
     persist = features.pop("persist")
     full_name = features.pop("full_name")
     notes = features.pop("notes")
+    actual_label = features.pop("actual_label")
     result = predict_one(features)
     saved = None
     if persist:
@@ -94,6 +111,7 @@ def predict(patient: PatientIn) -> dict:
                 "thal": features["thal"],
                 "predicted_label": result["label"],
                 "predicted_proba": result["probability"],
+                "actual_label": actual_label,
                 "notes": notes,
             }
         )
@@ -107,7 +125,16 @@ def predict(patient: PatientIn) -> dict:
                 "contributions": result["contributions"],
             }
         )
-    return {**result, "patient": saved, "features": features, "full_name": full_name}
+        if actual_label is not None:
+            background.add_task(refresh_from_registry)
+    return {
+        **result,
+        "patient": saved,
+        "features": features,
+        "full_name": full_name,
+        "actual_label": actual_label,
+        "learning": persist and actual_label is not None,
+    }
 
 
 @app.get("/api/patients")
@@ -138,8 +165,12 @@ def template() -> PlainTextResponse:
 
 
 @app.post("/api/import")
-async def import_patients(file: UploadFile = File(...), persist: bool = Query(True)) -> dict:
+async def import_patients(
+    background: BackgroundTasks, file: UploadFile = File(...), persist: bool = Query(True)
+) -> dict:
     content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Fichier trop volumineux (5 Mo maximum).")
     try:
         frame = frame_from_upload(content, file.filename or "import.csv")
     except ValueError as exc:
@@ -186,12 +217,17 @@ async def import_patients(file: UploadFile = File(...), persist: bool = Query(Tr
     accuracy = (
         sum(1 for r in with_truth if r["actual_label"] == r["label"]) / len(with_truth) if with_truth else None
     )
+    learning = persist and bool(with_truth)
+    if learning:
+        background.add_task(refresh_from_registry)
     return {
         "filename": file.filename,
         "rows": len(results),
         "saved": saved,
         "positives": positives,
+        "confirmed": len(with_truth),
         "accuracy": accuracy,
+        "learning": learning,
         "items": results,
         "storage": db.storage_status(),
     }
@@ -260,3 +296,25 @@ def export_patients(format: str = Query("csv", pattern="^(csv|xlsx)$")) -> Respo
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="atrium-patients-{stamp}.csv"'},
     )
+
+
+# --- Frontend construit (image Docker / Space Hugging Face) -------------------------------
+_static = Path(settings.atrium_static_dir) if settings.atrium_static_dir else None
+if _static and (_static / "index.html").exists():
+    app.mount("/assets", StaticFiles(directory=_static / "assets"), name="assets")
+    if (_static / "models").exists():
+        app.mount("/models", StaticFiles(directory=_static / "models"), name="models")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def spa(full_path: str) -> Response:
+        """Toute route non-API renvoie l'application : un rafraîchissement garde la page courante."""
+        candidate = _static / full_path
+        if full_path and candidate.is_file():
+            return Response(candidate.read_bytes(), media_type=_guess_type(candidate))
+        return Response((_static / "index.html").read_bytes(), media_type="text/html; charset=utf-8")
+
+
+def _guess_type(path: Path) -> str:
+    import mimetypes
+
+    return mimetypes.guess_type(path.name)[0] or "application/octet-stream"

@@ -17,6 +17,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { PointerTracker } from "@/components/PointerTracker";
 import { HeartbeatSound } from "@/components/HeartbeatSound";
+import { CursorGlow } from "@/components/CursorGlow";
 import { SoundToggle } from "@/components/SoundToggle";
 import { VesselBackground } from "@/components/heart/VesselBackground";
 import { HeartScene } from "@/components/heart/HeartScene";
@@ -32,15 +33,15 @@ function StorageBadge() {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Badge variant={cloud ? "default" : "secondary"} className="gap-1.5">
+        <Badge variant={cloud ? "default" : "destructive"} className="gap-1.5">
           {cloud ? <CloudIcon /> : <DatabaseIcon />}
-          {cloud ? "Supabase connecté" : "SQLite local"}
+          {cloud ? "Supabase connecté" : "Supabase injoignable"}
         </Badge>
       </TooltipTrigger>
       <TooltipContent>
         {cloud
-          ? "Les dossiers et les métriques sont écrits dans le projet Supabase."
-          : "Cloud injoignable : les dossiers sont conservés dans une copie locale."}
+          ? "Les dossiers, prédictions et métriques sont écrits dans le projet Supabase (PostgreSQL)."
+          : "Hors-ligne : les dossiers sont gardés dans une copie locale temporaire jusqu'au retour du réseau."}
       </TooltipContent>
     </Tooltip>
   );
@@ -56,6 +57,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <SidebarProvider>
       <PointerTracker />
       <HeartbeatSound />
+      <CursorGlow />
       <AppSidebar />
       <SidebarInset className="relative isolate overflow-x-clip">
         <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">

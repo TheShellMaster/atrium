@@ -9,9 +9,9 @@ type Tone = "default" | "safe" | "risk" | "warn";
 
 const TONE_TEXT: Record<Tone, string> = {
   default: "text-foreground",
-  safe: "text-safe",
-  risk: "text-risk",
-  warn: "text-warn",
+  safe: "text-safe dark:glow-text",
+  risk: "text-risk dark:glow-text",
+  warn: "text-warn dark:glow-text",
 };
 
 /** Chiffre animé (compte lentement jusqu'à la valeur). */

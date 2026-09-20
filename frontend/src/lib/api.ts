@@ -1,7 +1,10 @@
 import type { Catalog, ImportResult, ModelCard, PatientRow, Prediction, Regression, Stats } from "./types";
 
+/** Base de l'API : vide en local (proxy Vite), ou l'URL du backend hébergé (VITE_API_URL). */
+export const API_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+
 async function read<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
     ...init,
   });
@@ -24,7 +27,7 @@ export const api = {
   importFile: async (file: File, persist = true): Promise<ImportResult> => {
     const body = new FormData();
     body.append("file", file);
-    const response = await fetch(`/api/import?persist=${persist}`, { method: "POST", body });
+    const response = await fetch(`${API_BASE}/api/import?persist=${persist}`, { method: "POST", body });
     if (!response.ok) {
       const text = await response.text();
       let detail = text;
@@ -37,6 +40,7 @@ export const api = {
     }
     return response.json() as Promise<ImportResult>;
   },
-  exportUrl: (format: "csv" | "xlsx") => `/api/export?format=${format}`,
-  templateUrl: "/api/template.csv",
+  exportUrl: (format: "csv" | "xlsx") => `${API_BASE}/api/export?format=${format}`,
+  templateUrl: `${API_BASE}/api/template.csv`,
+  docsUrl: `${API_BASE || "http://127.0.0.1:8000"}/docs`,
 };
