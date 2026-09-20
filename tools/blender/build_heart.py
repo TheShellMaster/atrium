@@ -73,15 +73,19 @@ RAYON_TRONC_PULMONAIRE = 0.13
 RAYON_ARTERE_PULMONAIRE = 0.095
 RAYON_VEINE_CAVE_SUP = 0.115
 RAYON_VEINE_CAVE_INF = 0.125
-RAYON_VEINE_PULMONAIRE = 0.06
-RAYON_CORONAIRE = 0.025
-RAYON_CORONAIRE_BRANCHE = 0.017
+RAYON_VEINE_PULMONAIRE = 0.055
+RAYON_CORONAIRE = 0.022
+RAYON_CORONAIRE_BRANCHE = 0.015
 
 # Axe long du cœur : de la base (haut) vers l'apex (bas, en avant, à gauche du patient).
-BASE = Vector((-0.05, 0.05, 0.30))
-APEX = Vector((0.40, -0.15, -1.00))
+BASE = Vector((-0.05, 0.05, 0.28))
+APEX = Vector((0.36, -0.16, -1.00))
 AXE = APEX - BASE
 AXE_U = AXE.normalized()
+# Normale du plan de la base (sillon auriculo-ventriculaire). Plus inclinée que
+# l'axe long : en vue de face, le sillon AV droit descend obliquement vers le
+# bord droit du cœur (trajet de la coronaire droite).
+NORMALE_BASE = Vector((0.48, -0.18, -1.0)).normalized()
 
 
 # ---------------------------------------------------------------------------
@@ -280,25 +284,27 @@ def construire_muscle(materiau):
 
     sur_axe = lambda t: BASE + AXE * t  # noqa: E731 — point sur l'axe long (t = 0 base, 1 apex)
 
-    # --- Ventricules : cône oblique effilé vers l'apex (blend doux, raideur 4)
-    ajouter_element(mb, "ELLIPSOID", sur_axe(0.32), (0.55, 0.42, 0.72), AXE_U, 4.0)   # corps (VG + septum)
-    ajouter_element(mb, "BALL", sur_axe(0.62), 0.40, None, 4.0)                        # tiers moyen
-    ajouter_element(mb, "BALL", sur_axe(0.85), 0.27, None, 4.0)                        # tiers apical
-    ajouter_element(mb, "BALL", sur_axe(0.98), 0.15, None, 4.0)                        # pointe de l'apex
-    # Ventricule droit : bombement antéro-droit (côté −X, −Y)
-    ajouter_element(mb, "ELLIPSOID", sur_axe(0.42) + Vector((-0.24, -0.28, 0.02)), (0.36, 0.26, 0.50), AXE_U, 4.0)
-    # Bord inférieur (quasi rectiligne de l'apex vers le bord droit)
-    ajouter_element(mb, "ELLIPSOID", (-0.12, -0.22, -0.60), (0.22, 0.20, 0.36), (0.95, 0.10, -0.60), 4.0)
+    # --- Ventricule gauche : cône oblique, large à la base, effilé vers l'apex (blend doux, raideur 4)
+    ajouter_element(mb, "ELLIPSOID", sur_axe(0.30), (0.60, 0.46, 0.68), AXE_U, 4.0)   # corps (VG + septum)
+    ajouter_element(mb, "BALL", sur_axe(0.60), 0.48, None, 4.0)                        # tiers moyen
+    ajouter_element(mb, "BALL", sur_axe(0.82), 0.32, None, 4.0)                        # tiers apical
+    ajouter_element(mb, "BALL", sur_axe(0.98), 0.16, None, 4.0)                        # pointe de l'apex
+    # --- Ventricule droit : masse antéro-droite (−X, −Y), presque verticale, sous le sillon AV
+    ajouter_element(mb, "ELLIPSOID", (-0.18, -0.26, -0.36), (0.36, 0.27, 0.46), (0.30, -0.12, -1.0), 4.0)
+    # Bord droit inférieur (« bord aigu ») : angle inféro-droit du cœur
+    ajouter_element(mb, "BALL", (-0.30, -0.16, -0.56), 0.27, None, 4.0)
+    # Face inférieure (diaphragmatique) : quasi rectiligne du bord aigu à l'apex
+    ajouter_element(mb, "ELLIPSOID", (0.02, -0.14, -0.76), (0.24, 0.20, 0.40), (1.0, -0.05, -0.35), 4.0)
     # Infundibulum (cône artériel du VD) : base du tronc pulmonaire
-    ajouter_element(mb, "ELLIPSOID", (-0.02, -0.40, 0.26), (0.20, 0.17, 0.24), (0.15, -0.05, 1.0), 4.0)
-    # Masse basale : tissu autour des racines aortique/pulmonaire
-    ajouter_element(mb, "BALL", (-0.06, 0.12, 0.34), 0.28, None, 4.0)
+    ajouter_element(mb, "ELLIPSOID", (-0.04, -0.40, 0.24), (0.20, 0.16, 0.24), (0.2, -0.05, 1.0), 4.0)
+    # Masse basale : tissu autour des racines aortique/pulmonaire, entre les oreillettes
+    ajouter_element(mb, "BALL", (-0.04, 0.12, 0.34), 0.32, None, 4.0)
 
     # --- Oreillettes (raideur plus forte → lobes distincts, sillon AV marqué)
-    ajouter_element(mb, "ELLIPSOID", (-0.44, 0.10, 0.36), (0.27, 0.27, 0.33), (0, 0, 1), 6.0)          # oreillette droite
-    ajouter_element(mb, "ELLIPSOID", (-0.32, -0.15, 0.46), (0.12, 0.13, 0.20), (1.0, -0.3, 0.1), 6.0)   # auricule droit
-    ajouter_element(mb, "ELLIPSOID", (0.18, 0.45, 0.40), (0.36, 0.30, 0.32), (0, 0, 1), 6.0)            # oreillette gauche
-    ajouter_element(mb, "ELLIPSOID", (0.42, -0.12, 0.42), (0.10, 0.11, 0.19), (-0.7, -0.7, 0.1), 6.0)   # auricule gauche
+    ajouter_element(mb, "ELLIPSOID", (-0.46, 0.08, 0.30), (0.25, 0.26, 0.34), (0.22, -0.08, 1.0), 5.0)  # oreillette droite
+    ajouter_element(mb, "ELLIPSOID", (-0.30, -0.16, 0.44), (0.11, 0.12, 0.17), (1.0, -0.35, 0.15), 6.0)  # auricule droit
+    ajouter_element(mb, "ELLIPSOID", (0.16, 0.44, 0.52), (0.36, 0.30, 0.30), (0, 0, 1), 5.0)            # oreillette gauche
+    ajouter_element(mb, "ELLIPSOID", (0.42, 0.10, 0.60), (0.10, 0.11, 0.19), (-0.6, -0.8, 0.0), 6.0)    # auricule gauche
 
     obj_meta = bpy.data.objects.new("Myocarde_meta", mb)
     bpy.context.scene.collection.objects.link(obj_meta)
@@ -342,9 +348,10 @@ def projeter(muscle, point):
 
 
 def base_plan_axes():
-    """Vecteurs unitaires du plan de la base (⊥ axe long) : ex ≈ +X (gauche patient), ey ≈ +Y (postérieur)."""
-    ex = (Vector((1, 0, 0)) - Vector((1, 0, 0)).dot(AXE_U) * AXE_U).normalized()
-    ey = ex.cross(AXE_U).normalized()
+    """Vecteurs unitaires du plan de la base (⊥ NORMALE_BASE) : ex ≈ +X (gauche patient), ey ≈ +Y (postérieur)."""
+    n = NORMALE_BASE
+    ex = (Vector((1, 0, 0)) - Vector((1, 0, 0)).dot(n) * n).normalized()
+    ey = ex.cross(n).normalized()
     if ey.y < 0:
         ey = -ey
     return ex, ey
@@ -358,7 +365,7 @@ def points_sillon_coronaire(muscle, n=180):
     """
     ex, ey = base_plan_axes()
     centre = Vector((-0.06, 0.06, 0.22))
-    a, b = 0.66, 0.54
+    a, b = 0.68, 0.54
     points, angles = [], []
     for i in range(n):
         theta = 360.0 * i / n
@@ -372,17 +379,17 @@ def points_sillon_coronaire(muscle, n=180):
 
 def poids_sillon_coronaire(theta):
     """Le sillon AV n'est visible qu'en dehors du secteur antérieur (racines des gros
-    vaisseaux, auricules) : pleine profondeur pour θ ∈ [40°, 235°], fondu de 25°."""
+    vaisseaux, auricules) : pleine profondeur pour θ ∈ [30°, 250°], fondu de 25°."""
     def fondu(x):
         x = max(0.0, min(1.0, x))
         return x * x * (3 - 2 * x)
-    return fondu((theta - 15.0) / 25.0) * fondu((260.0 - theta) / 25.0)
+    return fondu((theta - 5.0) / 25.0) * fondu((275.0 - theta) / 25.0)
 
 
 def points_sillon_anterieur(muscle, n=60):
     """Sillon interventriculaire antérieur : du bord de l'infundibulum jusqu'à l'apex (et un peu au-delà)."""
-    p0 = Vector((-0.02, -0.62, 0.16))
-    p1 = Vector((0.36, -0.36, -0.90))
+    p0 = Vector((0.02, -0.62, 0.12))
+    p1 = APEX + Vector((-0.04, -0.22, 0.10))
     pts = []
     for i in range(n):
         t = i / (n - 1) * 1.08
@@ -394,7 +401,7 @@ def points_sillon_anterieur(muscle, n=60):
 
 def points_sillon_posterieur(muscle, croix, n=55):
     """Sillon interventriculaire postérieur : de la croix (arrière du sillon AV) vers l'apex."""
-    p1 = Vector((0.36, -0.02, -0.94))
+    p1 = APEX + Vector((0.0, 0.15, 0.06))
     pts = []
     for i in range(n):
         t = i / (n - 1)
@@ -479,19 +486,19 @@ def construire_arteres(materiau):
     """Aorte ascendante, crosse (avec tronc brachio-céphalique, carotide et sous-clavière gauches),
     aorte descendante coupée derrière l'oreillette gauche."""
     aorte = creer_tube("Aorte", [
-        (-0.10, 0.06, 0.40),   # racine (dans la masse basale), bulbe
-        (-0.11, 0.04, 0.66),   # aorte ascendante
-        (-0.07, 0.04, 0.88),
-        (0.06, 0.16, 1.08),    # sommet de la crosse
-        (0.24, 0.42, 1.02),    # la crosse part vers l'arrière-gauche
-        (0.32, 0.68, 0.82),
-        (0.32, 0.80, 0.50),    # aorte descendante (section)
-    ], RAYON_AORTE, facteurs=[1.15, 1.06, 1.0, 1.0, 0.96, 0.92, 0.90])
-    tronc_bc = creer_tube("TroncBrachioCephalique", [(-0.04, 0.09, 0.98), (-0.09, 0.06, 1.16), (-0.13, 0.04, 1.32)],
+        (-0.10, 0.06, 0.36),   # racine (dans la masse basale), bulbe
+        (-0.11, 0.04, 0.60),   # aorte ascendante
+        (-0.07, 0.05, 0.80),
+        (0.06, 0.16, 0.98),    # sommet de la crosse
+        (0.28, 0.36, 0.96),    # la crosse part vers l'arrière-gauche
+        (0.40, 0.58, 0.82),
+        (0.42, 0.72, 0.60),    # aorte descendante (courte section derrière l'oreillette gauche)
+    ], RAYON_AORTE, facteurs=[1.15, 1.06, 1.0, 1.0, 0.96, 0.92, 0.88])
+    tronc_bc = creer_tube("TroncBrachioCephalique", [(-0.05, 0.10, 0.86), (-0.10, 0.07, 1.02), (-0.14, 0.05, 1.16)],
                           RAYON_BRACHIOCEPHALIQUE, facteurs=[1.0, 1.0, 0.9], resolution_biseau=6)
-    carotide = creer_tube("CarotideGauche", [(0.08, 0.16, 1.04), (0.08, 0.16, 1.20), (0.09, 0.17, 1.34)],
+    carotide = creer_tube("CarotideGauche", [(0.08, 0.17, 0.92), (0.08, 0.18, 1.06), (0.09, 0.19, 1.18)],
                           RAYON_BRANCHE_CROSSE, facteurs=[1.0, 1.0, 0.9], resolution_biseau=6)
-    sous_clav = creer_tube("SousClaviereGauche", [(0.19, 0.28, 1.01), (0.24, 0.33, 1.16), (0.29, 0.38, 1.28)],
+    sous_clav = creer_tube("SousClaviereGauche", [(0.21, 0.29, 0.90), (0.25, 0.33, 1.03), (0.29, 0.37, 1.14)],
                            RAYON_BRANCHE_CROSSE, facteurs=[1.0, 1.0, 0.9], resolution_biseau=6)
     obj = fusionner_maillages("Arteres", [aorte, tronc_bc, carotide, sous_clav], materiau)
     return obj
@@ -502,37 +509,38 @@ def construire_veines(materiaux):
     tubes = []
     # Tronc pulmonaire : naît de l'infundibulum, monte devant l'aorte, se continue en artère pulmonaire gauche
     tubes.append(creer_tube("TroncPulmonaire", [
-        (-0.02, -0.40, 0.30),
-        (0.02, -0.41, 0.56),
-        (0.10, -0.33, 0.78),
-        (0.18, -0.22, 0.88),   # bifurcation
-        (0.34, -0.12, 0.84),   # artère pulmonaire gauche
-        (0.50, 0.00, 0.76),
-        (0.62, 0.10, 0.66),
+        (-0.04, -0.40, 0.26),
+        (0.00, -0.42, 0.50),
+        (0.08, -0.36, 0.68),
+        (0.16, -0.24, 0.78),   # bifurcation
+        (0.30, -0.10, 0.72),   # artère pulmonaire gauche : sous la crosse, vers l'arrière-gauche
+        (0.44, 0.10, 0.64),
+        (0.56, 0.24, 0.56),
     ], RAYON_TRONC_PULMONAIRE, facteurs=[1.0, 1.0, 1.0, 0.95, 0.80, 0.74, 0.70]))
     # Artère pulmonaire droite : passe derrière l'aorte ascendante et la veine cave supérieure
     tubes.append(creer_tube("ArterePulmonaireDroite", [
-        (0.18, -0.22, 0.88),
-        (0.04, 0.06, 0.92),
-        (-0.22, 0.30, 0.92),
-        (-0.54, 0.34, 0.86),
-    ], RAYON_ARTERE_PULMONAIRE, facteurs=[1.0, 1.0, 0.95, 0.9]))
+        (0.16, -0.24, 0.78),
+        (0.10, 0.02, 0.80),
+        (-0.10, 0.30, 0.80),
+        (-0.40, 0.36, 0.76),
+        (-0.56, 0.36, 0.72),
+    ], RAYON_ARTERE_PULMONAIRE, facteurs=[1.0, 1.0, 0.95, 0.92, 0.9]))
     # Veine cave supérieure : verticale, au-dessus de l'oreillette droite
     tubes.append(creer_tube("VeineCaveSuperieure", [
-        (-0.48, 0.12, 0.50), (-0.49, 0.12, 0.82), (-0.47, 0.13, 1.10),
+        (-0.48, 0.12, 0.45), (-0.49, 0.12, 0.72), (-0.48, 0.13, 0.96),
     ], RAYON_VEINE_CAVE_SUP, facteurs=[1.0, 1.0, 0.95]))
     # Veine cave inférieure : sort par le bas / l'arrière de l'oreillette droite
     tubes.append(creer_tube("VeineCaveInferieure", [
-        (-0.44, 0.20, 0.24), (-0.47, 0.30, 0.00), (-0.50, 0.40, -0.26),
+        (-0.44, 0.20, 0.18), (-0.47, 0.30, -0.04), (-0.50, 0.40, -0.28),
     ], RAYON_VEINE_CAVE_INF, facteurs=[1.0, 1.0, 0.95]))
-    # 4 veines pulmonaires : arrivent dans l'oreillette gauche par l'arrière
-    for nom, depart, arrivee in (
-        ("VeinePulmSupD", (0.00, 0.55, 0.50), (-0.24, 0.80, 0.58)),
-        ("VeinePulmInfD", (0.00, 0.58, 0.32), (-0.24, 0.82, 0.24)),
-        ("VeinePulmSupG", (0.36, 0.56, 0.50), (0.60, 0.76, 0.58)),
-        ("VeinePulmInfG", (0.36, 0.58, 0.32), (0.60, 0.78, 0.24)),
+    # 4 veines pulmonaires : arrivent dans l'oreillette gauche par l'arrière (légèrement incurvées, effilées)
+    for nom, chemin in (
+        ("VeinePulmSupD", [(0.00, 0.50, 0.60), (-0.16, 0.68, 0.66), (-0.32, 0.86, 0.72)]),
+        ("VeinePulmInfD", [(0.00, 0.54, 0.42), (-0.16, 0.72, 0.38), (-0.32, 0.90, 0.32)]),
+        ("VeinePulmSupG", [(0.32, 0.50, 0.60), (0.48, 0.68, 0.66), (0.62, 0.84, 0.72)]),
+        ("VeinePulmInfG", [(0.32, 0.54, 0.42), (0.48, 0.72, 0.38), (0.62, 0.88, 0.32)]),
     ):
-        tubes.append(creer_tube(nom, [depart, arrivee], RAYON_VEINE_PULMONAIRE, resolution_biseau=5))
+        tubes.append(creer_tube(nom, chemin, RAYON_VEINE_PULMONAIRE, facteurs=[1.0, 0.95, 0.85], resolution_biseau=5))
 
     tubes_veine = [t for t in tubes if not t.name.startswith(("TroncPulmonaire", "ArterePulmonaire"))]
     tubes_pulm = [t for t in tubes if t.name.startswith(("TroncPulmonaire", "ArterePulmonaire"))]
@@ -546,7 +554,7 @@ def construire_veines(materiaux):
 # Coronaires
 # ---------------------------------------------------------------------------
 
-def plaquer(muscle, points, rayon, saillie=0.7):
+def plaquer(muscle, points, rayon, saillie=0.6):
     """Projette chaque point sur le muscle et le décale de saillie·rayon le long de la normale."""
     res = []
     for p in points:
@@ -574,20 +582,20 @@ def construire_coronaires(muscle, materiau, sillon_av, angles_av, sillon_ant, si
     tubes = []
     r, rb = RAYON_CORONAIRE, RAYON_CORONAIRE_BRANCHE
 
-    # Coronaire droite : racine aortique antéro-droite → sillon AV droit → croix → IVP
-    depart_cd = [Vector((-0.20, -0.12, 0.40)), Vector((-0.30, -0.28, 0.30))]
-    chemin_cd = depart_cd + selection_angulaire(sillon_av, angles_av, 244, 96, pas=3) + sillon_post[2::3]
+    # Coronaire droite : racine aortique antéro-droite (sous l'auricule droit) → sillon AV droit → croix → IVP
+    depart_cd = [Vector((-0.18, -0.16, 0.36))]
+    segment_av = selection_angulaire(sillon_av, angles_av, 262, 96, pas=3)
+    chemin_cd = depart_cd + segment_av + sillon_post[2::3]
     tubes.append(creer_tube("CoronaireDroite", plaquer(muscle, chemin_cd, r), r,
                             type_spline="NURBS", resolution_u=4, resolution_biseau=3))
-    # Branche marginale droite : descend le long du bord inférieur du VD
-    idx_marg = len(depart_cd) + int(len(selection_angulaire(sillon_av, angles_av, 244, 96, pas=3)) * 0.35)
-    origine = chemin_cd[idx_marg]
-    chemin_marg = [origine + Vector((0.02, -0.06, -0.14)) * k + Vector((0.0, -0.02, -0.02)) * k * k for k in range(6)]
+    # Branche marginale droite : descend le long du bord aigu du VD
+    origine = chemin_cd[len(depart_cd) + int(len(segment_av) * 0.40)]
+    chemin_marg = [origine + Vector((0.03, -0.06, -0.14)) * k + Vector((0.0, -0.02, -0.02)) * k * k for k in range(6)]
     tubes.append(creer_tube("MarginaleDroite", plaquer(muscle, chemin_marg, rb), rb,
                             type_spline="NURBS", resolution_u=4, resolution_biseau=3))
 
     # Tronc coronaire gauche (caché entre aorte et tronc pulmonaire) → IVA le long du sillon antérieur
-    depart_cg = [Vector((0.08, -0.02, 0.40)), Vector((0.08, -0.30, 0.28))]
+    depart_cg = [Vector((0.08, -0.02, 0.36)), Vector((0.10, -0.32, 0.24))]
     chemin_iva = depart_cg + sillon_ant[1::2]
     tubes.append(creer_tube("Interventriculaire", plaquer(muscle, chemin_iva, r), r,
                             type_spline="NURBS", resolution_u=4, resolution_biseau=3))
@@ -597,7 +605,7 @@ def construire_coronaires(muscle, materiau, sillon_av, angles_av, sillon_ant, si
     tubes.append(creer_tube("Diagonale", plaquer(muscle, chemin_diag, rb), rb,
                             type_spline="NURBS", resolution_u=4, resolution_biseau=3))
     # Circonflexe : sous l'auricule gauche, dans le sillon AV gauche jusqu'à la face postérieure
-    chemin_cx = [Vector((0.12, -0.04, 0.40))] + selection_angulaire(sillon_av, angles_av, 318, 420, pas=3)
+    chemin_cx = [Vector((0.12, -0.04, 0.36))] + selection_angulaire(sillon_av, angles_av, 318, 420, pas=3)
     tubes.append(creer_tube("Circonflexe", plaquer(muscle, chemin_cx, r * 0.9), r * 0.9,
                             type_spline="NURBS", resolution_u=4, resolution_biseau=3))
 
@@ -749,11 +757,14 @@ def regler_moteur(scene, moteur):
         sh = scene.display.shading
         sh.light = "STUDIO"
         sh.color_type = "MATERIAL"
-        sh.show_cavity = True
-        sh.cavity_type = "BOTH"
-        sh.show_shadow = True
-        sh.show_specular_highlight = True
-        sh.show_object_outline = False
+        # Les attributs varient selon la version : on ne règle que ceux qui existent.
+        for attr, valeur in (("show_cavity", True), ("cavity_type", "BOTH"), ("show_shadow", True),
+                             ("show_specular_highlight", True), ("show_object_outline", False)):
+            if hasattr(sh, attr):
+                try:
+                    setattr(sh, attr, valeur)
+                except (TypeError, AttributeError):
+                    pass
     elif moteur == "CYCLES":
         scene.cycles.samples = 48
         scene.cycles.device = "CPU"

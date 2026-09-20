@@ -71,6 +71,7 @@ def train(random_state: int = 42) -> dict:
     pipe = build_pipeline()
     pipe.fit(x_train, y_train)
     proba = pipe.predict_proba(x_test)[:, 1]
+    logits = pipe.decision_function(x_test)
     pred = (proba >= settings.threshold).astype(int)
     confusion = from_predictions(y_test.to_numpy(), pred)
     auc = float(roc_auc_score(y_test, proba))
@@ -84,6 +85,15 @@ def train(random_state: int = 42) -> dict:
         "coefficients": coefficient_table(pipe),
         "intercept": float(pipe.named_steps["clf"].intercept_[0]),
         "roc": roc_points(y_test.to_numpy(), proba),
+        "sigmoid": {
+            "curve": [
+                {"z": float(z), "p": float(1 / (1 + np.exp(-z)))} for z in np.linspace(-6, 6, 121)
+            ],
+            "patients": [
+                {"z": float(z), "p": float(p), "y": int(y)}
+                for z, p, y in zip(logits, proba, y_test.to_numpy(), strict=True)
+            ],
+        },
         "dataset": "UCI Heart Disease (Cleveland), 303 patients réels",
         "notes": "Régression logistique entraînée sur un quart de test stratifié.",
     }
@@ -187,3 +197,28 @@ def _to_python(value: object) -> float | int:
 def dataset_preview(limit: int = 8) -> list[dict]:
     data = load_dataset().head(limit)
     return json.loads(data.to_json(orient="records"))
+
+
+def predict_frame(frame: pd.DataFrame) -> list[dict]:
+    """Prédit toutes les lignes d'un tableau importé (CSV / Excel)."""
+    pipe = load_model()
+    features = frame[FEATURE_ORDER].astype(float)
+    probas = pipe.predict_proba(features)[:, 1]
+    results = []
+    for (_, row), proba in zip(frame.iterrows(), probas, strict=True):
+        proba = float(proba)
+        results.append(
+            {
+                "full_name": (str(row["full_name"]) if "full_name" in frame.columns and pd.notna(row.get("full_name")) else None),
+                "features": {key: _to_python(row[key]) for key in FEATURE_ORDER},
+                "probability": proba,
+                "label": int(proba >= settings.threshold),
+                "risk": risk_label(proba),
+                "actual_label": (
+                    int(row["actual_label"])
+                    if "actual_label" in frame.columns and pd.notna(row.get("actual_label"))
+                    else None
+                ),
+            }
+        )
+    return results

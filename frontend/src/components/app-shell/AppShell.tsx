@@ -17,6 +17,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { PointerTracker } from "@/components/PointerTracker";
 import { VesselBackground } from "@/components/heart/VesselBackground";
+import { HeartScene } from "@/components/heart/HeartScene";
+import { cn } from "@/lib/utils";
 import { AppSidebar, NAV } from "./AppSidebar";
 import { useData } from "@/context/Data";
 
@@ -51,9 +53,19 @@ export function AppShell({ children }: { children: ReactNode }) {
       <PointerTracker />
       <AppSidebar />
       <SidebarInset className="relative isolate overflow-x-clip">
-        {pathname === "/" ? (
-          <VesselBackground className="absolute inset-0 -z-10 hidden dark:block" seed={11} trunks={6} intensity={0.2} />
-        ) : null}
+        <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
+          <div className="sticky top-0 h-dvh w-full overflow-hidden">
+            <VesselBackground
+              className="absolute inset-0 opacity-70 dark:opacity-100"
+              seed={11}
+              trunks={9}
+              intensity={pathname === "/" ? 0.42 : 0.26}
+              center={[0.7, 0.48]}
+              reach={1.15}
+            />
+            <HeartScene className={cn("absolute inset-0 transition-opacity duration-1000", pathname === "/" ? "opacity-100" : "opacity-60")} />
+          </div>
+        </div>
         <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />

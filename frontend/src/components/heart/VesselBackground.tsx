@@ -13,8 +13,6 @@ type Vessel = {
 
 const W = 1000;
 const H = 600;
-const CX = 500;
-const CY = 300;
 
 /** Générateur pseudo-aléatoire déterministe (même réseau à chaque rendu). */
 function rng(seed: number) {
@@ -25,7 +23,7 @@ function rng(seed: number) {
   };
 }
 
-function polar(r: number, a: number, cx = CX, cy = CY): [number, number] {
+function polar(r: number, a: number, cx: number, cy: number): [number, number] {
   return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
 }
 
@@ -38,7 +36,7 @@ function cubic(p0: number[], p1: number[], p2: number[], p3: number[], t: number
 }
 
 /** Réseau de vaisseaux : troncs qui partent du cœur vers les bords, puis ramifications. */
-function buildNetwork(seed: number, trunks: number): Vessel[] {
+function buildNetwork(seed: number, trunks: number, cx: number, cy: number, reach: number): Vessel[] {
   const rand = rng(seed);
   const vessels: Vessel[] = [];
 
@@ -49,10 +47,10 @@ function buildNetwork(seed: number, trunks: number): Vessel[] {
     const a = (i / trunks) * Math.PI * 2 + (rand() - 0.5) * 0.5;
     const kind: Vessel["kind"] = i % 2 === 0 ? "artery" : "vein";
     const bend = (rand() - 0.5) * 2.2;
-    const p0 = polar(105 + rand() * 25, a);
-    const p1 = polar(190 + rand() * 60, a + bend * 0.35);
-    const p2 = polar(330 + rand() * 90, a + bend * 0.85);
-    const p3 = polar(640 + rand() * 80, a + bend * 0.55);
+    const p0 = polar((105 + rand() * 25) * reach, a, cx, cy);
+    const p1 = polar((190 + rand() * 60) * reach, a + bend * 0.35, cx, cy);
+    const p2 = polar((330 + rand() * 90) * reach, a + bend * 0.85, cx, cy);
+    const p3 = polar((640 + rand() * 80) * reach, a + bend * 0.55, cx, cy);
     const trunk = [p0, p1, p2, p3];
     vessels.push({ d: path(trunk), kind, width: 3.2 + rand() * 1.8, cells: 5, duration: 7 + rand() * 3 });
 
@@ -103,15 +101,23 @@ export function VesselBackground({
   seed = 7,
   trunks = 8,
   intensity = 1,
+  center = [0.5, 0.5],
+  reach = 1,
 }: {
   className?: string;
   seed?: number;
   trunks?: number;
   intensity?: number;
+  /** Position du cœur dans le cadre (fractions 0..1). */
+  center?: [number, number];
+  /** Étirement du réseau (1 = cadre 1000×600). */
+  reach?: number;
 }) {
   const { mood } = useCabinet();
   const uid = useId().replace(/:/g, "");
-  const vessels = useMemo(() => buildNetwork(seed, trunks), [seed, trunks]);
+  const CX = W * center[0];
+  const CY = H * center[1];
+  const vessels = useMemo(() => buildNetwork(seed, trunks, CX, CY, reach), [seed, trunks, CX, CY, reach]);
 
   return (
     <div
@@ -140,7 +146,7 @@ export function VesselBackground({
         <circle
           cx={CX}
           cy={CY}
-          r="260"
+          r={260 * reach}
           fill={`url(#heartglow-${uid})`}
           style={{ animation: "vessel-pulse var(--beat) ease-in-out infinite" }}
         />

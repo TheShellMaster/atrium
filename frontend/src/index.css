@@ -168,6 +168,18 @@
     }
 }
 
+@layer components {
+  /* Les cartes laissent transparaître le cœur et les vaisseaux en arrière-plan. */
+  [data-slot="card"] {
+    background-color: color-mix(in oklch, var(--card) 88%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  .dark [data-slot="card"] {
+    background-color: color-mix(in oklch, var(--card) 78%, transparent);
+  }
+}
+
 @layer utilities {
   .bg-clinical-grid {
     background-image:

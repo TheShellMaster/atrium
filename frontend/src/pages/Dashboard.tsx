@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { HeartScene } from "@/components/heart/HeartScene";
-import { VesselBackground } from "@/components/heart/VesselBackground";
 import { MedTerm } from "@/components/MedTerm";
 import { StatCard } from "@/components/StatCard";
 import { PageHeader } from "@/components/PageHeader";
@@ -180,38 +178,47 @@ export function Dashboard() {
       </RevealGroup>
 
       <RevealGroup className="grid gap-4 lg:grid-cols-3" stagger={0.12}>
-        <RevealItem className="lg:col-span-2">
+        <RevealItem>
           <Card className="h-full">
             <CardHeader>
               <CardTitle>Le cœur sous observation</CardTitle>
               <CardDescription>
                 Survole <MedTerm id="systole">la systole</MedTerm>, <MedTerm id="diastole">la diastole</MedTerm> ou{" "}
-                <MedTerm id="angor">l'angor</MedTerm> : le cœur change de rythme.
+                <MedTerm id="angor">l'angor</MedTerm> : le cœur en arrière-plan change de rythme.
               </CardDescription>
               <CardAction>
-                <Badge variant="outline" className="gap-1.5">
+                <Badge variant={mood === "warn" ? "destructive" : "outline"} className="gap-1.5">
                   <ActivityIcon />
                   {rhythm.bpm} bpm
                 </Badge>
               </CardAction>
             </CardHeader>
-            <CardContent className="flex-1">
-              <div className="relative h-[360px] overflow-hidden rounded-lg bg-background md:h-[440px]">
-                <VesselBackground className="absolute inset-0" trunks={10} />
-                <HeartScene className="absolute inset-0" glow={false} />
-                <div className="pointer-events-none absolute inset-x-4 bottom-3 flex items-end justify-between">
-                  <div className="flex flex-col">
-                    <span className="text-xs text-muted-foreground">État</span>
-                    <span className={cn("text-sm font-medium", mood === "warn" ? "text-risk" : "text-foreground")}>
-                      {rhythm.label}
-                    </span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">Modèle 3D · Blender → GLB</span>
+            <CardContent className="flex flex-1 flex-col gap-4">
+              <div className="flex items-end justify-between gap-3">
+                <div className="flex flex-col">
+                  <span className="text-xs text-muted-foreground">État</span>
+                  <span className={cn("text-lg font-medium", mood === "warn" ? "text-risk" : "text-foreground")}>{rhythm.label}</span>
                 </div>
+                <span className="text-xs text-muted-foreground">60 / {rhythm.bpm} s par battement</span>
               </div>
+              <EcgLine className="h-10" />
+              <ul className="flex flex-col gap-2 text-xs text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-risk" />
+                  Artères : sang oxygéné qui quitte le cœur
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-chart-5" />
+                  Veines : retour du sang vers le cœur
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-foreground/70" />
+                  Globules : la vitesse suit le rythme cardiaque
+                </li>
+              </ul>
             </CardContent>
-            <CardFooter className="py-2">
-              <EcgLine className="h-8" />
+            <CardFooter className="py-2 text-xs text-muted-foreground">
+              Modèle 3D « Realistic Human Heart » (CC BY 4.0), rendu translucide.
             </CardFooter>
           </Card>
         </RevealItem>
@@ -237,9 +244,10 @@ export function Dashboard() {
             </CardFooter>
           </Card>
         </RevealItem>
+        <div className="hidden lg:block" aria-hidden="true" />
       </RevealGroup>
 
-      <RevealGroup className="grid gap-4 lg:grid-cols-2" stagger={0.12}>
+      <RevealGroup className="grid gap-4 lg:grid-cols-3" stagger={0.12}>
         <RevealItem>
           <Card className="h-full">
             <CardHeader>
