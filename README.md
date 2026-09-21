@@ -41,11 +41,13 @@ GitHub Pages n'héberge que du statique : l'API Python (scikit-learn) ne peut pa
 
 Le plan gratuit met le service en veille après 15 minutes sans visite (premier chargement ensuite : 30 à 60 s). Pour une présentation, ouvrir le site quelques minutes avant, ou programmer un ping gratuit de `/api/health` toutes les 10 minutes (par exemple https://cron-job.org).
 
-### Option B — frontend sur Vercel, API sur Render
+### Option B — porte d'entrée Vercel devant Render (contourne les opérateurs qui bloquent `onrender.com`)
 
-1. Déployer l'API avec l'option A.
-2. Sur https://vercel.com/new, importer le dépôt, **Root Directory = `frontend`**, framework Vite, variable `VITE_API_URL=https://atrium.onrender.com`.
-3. Côté API, variable `ATRIUM_CORS_ORIGINS=https://<projet>.vercel.app` (les `*.vercel.app` sont déjà acceptés). `frontend/vercel.json` contient la réécriture SPA.
+Certains opérateurs mobiles filtrent tout `*.onrender.com`. `frontend/vercel.json` fait de Vercel la porte d'entrée : il sert l'interface et relaie lui-même `/api/*` vers Render (serveur à serveur), donc le navigateur ne parle qu'à Vercel.
+
+1. Déployer l'API avec l'option A (ou adapter l'URL Render dans `frontend/vercel.json`).
+2. Sur https://vercel.com/new, importer le dépôt, **Root Directory = `frontend`**, framework Vite, aucune variable nécessaire. Ou en ligne de commande : `cd frontend && npx vercel --prod`.
+3. Le site est alors disponible sur `https://<projet>.vercel.app`, avec les mêmes données Supabase.
 
 ### Hugging Face
 
