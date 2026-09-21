@@ -38,7 +38,9 @@ GitHub Pages n'héberge que du statique : l'API Python (scikit-learn) ne peut pa
 
 ### Production : Vercel (interface) + Render (API)
 
-Le navigateur n'ouvre que Vercel. `frontend/vercel.json` relaie `/api/*` vers Render (serveur à serveur), ce qui contourne les opérateurs qui bloquent `*.onrender.com`. Render ne contient plus l'interface : le `Dockerfile` est FastAPI seul. Une visite de `https://atrium-xscu.onrender.com/examen` redirige vers la même page sur Vercel, pour n'avoir qu'une UI (y compris sur mobile).
+Le navigateur n'ouvre que Vercel. `frontend/vercel.json` relaie `/api/*` vers Render (serveur à serveur), ce qui contourne les opérateurs qui bloquent `*.onrender.com`. Render ne contient plus l'interface : le `Dockerfile` installe uniquement Python et lance FastAPI. Une ancienne visite de `https://atrium-xscu.onrender.com/examen` est redirigée vers Vercel, pour n'avoir qu'une UI (y compris sur mobile).
+
+Le flux de production est donc : **GitHub** conserve le code, **Vercel** construit et sert `frontend/`, **Render** exécute le backend Python, et **Supabase** conserve les dossiers et métriques. Le lien Vercel présent dans le `Dockerfile` est une URL publique de redirection, pas une clé d'accès. Les secrets (`SUPABASE_ANON_KEY`, par exemple) ne sont jamais écrits dans le Dockerfile ni dans Git : ils sont configurés dans l'environnement Render. Le fichier local `.env` est ignoré par Git.
 
 Le plan gratuit Render met l'API en veille après 15 minutes (premier appel ensuite : 30 à 60 s). Pour une présentation, ouvrir le site quelques minutes avant, ou pinger `/api/health` (https://cron-job.org).
 

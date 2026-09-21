@@ -112,11 +112,12 @@ export function Docs() {
 
         <RevealItem>
           <Section id="architecture" title="2. Architecture">
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {[
                 ["Frontend", "React 19, Vite, TypeScript, Tailwind v4, shadcn/ui, recharts, motion, Three.js", "Pages, graphiques, cœur 3D, ECG, sons"],
+                ["Vercel", "Build statique du dossier frontend/", "Interface publique et relais /api vers Render"],
                 ["API Python", "FastAPI, Pydantic, scikit-learn, pandas, numpy", "Entraînement, prédiction, statistiques, import/export"],
-                ["Données", "Supabase (PostgreSQL + PostgREST + RLS), repli SQLite", "Patients, prédictions, métriques"],
+                ["Render + Supabase", "Docker API-only · PostgreSQL + PostgREST + RLS", "Backend exécuté par Render, données conservées dans Supabase"],
               ].map(([title, stack, role]) => (
                 <div key={title} className="rounded-lg border bg-muted/40 p-3">
                   <div className="font-medium">{title}</div>
@@ -127,9 +128,15 @@ export function Docs() {
               ))}
             </div>
             <p>
-              Le navigateur appelle l'<MedTerm id="api">API REST</MedTerm> (proxy Vite <code>/api</code> → port 8000). L'API charge le
-              modèle scikit-learn sérialisé, calcule, puis écrit dans <MedTerm id="supabase">Supabase</MedTerm> via PostgREST. Si le
-              cloud est injoignable, elle bascule sur une copie SQLite locale pour que la démonstration ne tombe jamais.
+              En local, le navigateur appelle l'<MedTerm id="api">API REST</MedTerm> via le proxy Vite (<code>/api</code> → port 8000). En
+              production, Vercel sert les fichiers statiques et relaie <code>/api/*</code> vers Render côté serveur. Render ne sert
+              donc aucun deuxième frontend : il exécute seulement FastAPI. L'API charge le modèle scikit-learn, calcule, puis écrit
+              dans <MedTerm id="supabase">Supabase</MedTerm> via PostgREST. Si le cloud est injoignable, elle bascule sur une copie
+              SQLite locale pour que la démonstration ne tombe jamais.
+            </p>
+            <p className="text-muted-foreground">
+              Le lien Vercel utilisé par Docker est public et sert uniquement à rediriger une ancienne URL Render. Les secrets ne sont
+              pas dans le code : <code>.env</code> reste local et les clés Supabase sont injectées dans l'environnement Render.
             </p>
           </Section>
         </RevealItem>
