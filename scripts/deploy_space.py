@@ -72,7 +72,7 @@ def main() -> int:
             print(f"Secret défini : {key}")
         else:
             print(f"Attention : {key} absent de .env, l'API basculera en copie locale.")
-    api.add_space_variable(repo_id, "ATRIUM_STATIC_DIR", "/app/static")
+    api.add_space_variable(repo_id, "ATRIUM_FRONTEND_URL", "https://atrium-chi-flax.vercel.app")
 
     print("Envoi du code…")
     api.upload_folder(

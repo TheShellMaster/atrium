@@ -13,7 +13,8 @@ license: cc-by-4.0
 
 Application web de prédiction du risque cardiovasculaire : régression logistique Python entraînée sur 918 patients réels (UCI, 4 hôpitaux), registre Supabase, interface dashboard shadcn/ui avec cœur anatomique 3D translucide, réseau vasculaire animé, ECG de moniteur, sons, lexique et documentation intégrés.
 
-- **Site en ligne : https://atrium-xscu.onrender.com** (Render, plan gratuit : première ouverture après une pause = 30 à 60 s de réveil)
+- **Site en ligne : https://atrium-chi-flax.vercel.app** (Vercel = interface ; Render = API)
+- API : https://atrium-xscu.onrender.com/api/health (première ouverture après une pause = 30 à 60 s de réveil)
 - Dépôt : https://github.com/TheShellMaster/atrium
 - Maquettes Figma (captures des écrans) : https://www.figma.com/design/nIvvsJEJQgtbKMdfRmMpOe
 - Documentation complète : page `/documentation` de l'application
@@ -33,21 +34,15 @@ Le modèle s'entraîne tout seul au premier démarrage. Les clés Supabase se me
 
 ## Héberger gratuitement
 
-GitHub Pages n'héberge que du statique : l'API Python (scikit-learn) ne peut pas y tourner. Le `Dockerfile` à la racine construit l'interface et la sert avec l'API sur le même domaine.
+GitHub Pages n'héberge que du statique : l'API Python (scikit-learn) ne peut pas y tourner.
 
-### Option A — tout-en-un sur Render (recommandé, gratuit, sans carte)
+### Production : Vercel (interface) + Render (API)
 
-`render.yaml` décrit le service. Sur https://dashboard.render.com : **New → Blueprint**, choisir le dépôt GitHub `atrium` (autoriser l'accès au dépôt privé), Render lit `render.yaml` ; renseigner les deux secrets `SUPABASE_URL` et `SUPABASE_ANON_KEY` (valeurs de `.env`) puis **Apply**. Première construction : 5 à 8 minutes. URL du type `https://atrium.onrender.com`.
+Le navigateur n'ouvre que Vercel. `frontend/vercel.json` relaie `/api/*` vers Render (serveur à serveur), ce qui contourne les opérateurs qui bloquent `*.onrender.com`. Render ne contient plus l'interface : le `Dockerfile` est FastAPI seul. Une visite de `https://atrium-xscu.onrender.com/examen` redirige vers la même page sur Vercel, pour n'avoir qu'une UI (y compris sur mobile).
 
-Le plan gratuit met le service en veille après 15 minutes sans visite (premier chargement ensuite : 30 à 60 s). Pour une présentation, ouvrir le site quelques minutes avant, ou programmer un ping gratuit de `/api/health` toutes les 10 minutes (par exemple https://cron-job.org).
+Le plan gratuit Render met l'API en veille après 15 minutes (premier appel ensuite : 30 à 60 s). Pour une présentation, ouvrir le site quelques minutes avant, ou pinger `/api/health` (https://cron-job.org).
 
-### Option B — porte d'entrée Vercel devant Render (contourne les opérateurs qui bloquent `onrender.com`)
-
-Certains opérateurs mobiles filtrent tout `*.onrender.com`. `frontend/vercel.json` fait de Vercel la porte d'entrée : il sert l'interface et relaie lui-même `/api/*` vers Render (serveur à serveur), donc le navigateur ne parle qu'à Vercel.
-
-1. Déployer l'API avec l'option A (ou adapter l'URL Render dans `frontend/vercel.json`).
-2. Sur https://vercel.com/new, importer le dépôt, **Root Directory = `frontend`**, framework Vite, aucune variable nécessaire. Ou en ligne de commande : `cd frontend && npx vercel --prod`.
-3. Le site est alors disponible sur `https://<projet>.vercel.app`, avec les mêmes données Supabase.
+Secrets Render : `SUPABASE_URL` et `SUPABASE_ANON_KEY`. Les pushes sur `master` redéploient Vercel (`frontend/`) et Render (Docker).
 
 ### Hugging Face
 
@@ -83,7 +78,7 @@ React 19, Vite, TypeScript, Tailwind v4, shadcn/ui, recharts, motion, Three.js, 
 backend/        FastAPI + scikit-learn (src/atrium), données UCI, tests
 frontend/       React + Vite + shadcn/ui + Three.js
 supabase/       migrations SQL
-Dockerfile      image tout-en-un (Space Hugging Face)
+Dockerfile      API Python seule (Render)
 ```
 
 ## Tests

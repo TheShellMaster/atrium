@@ -1,5 +1,4 @@
-# Blueprint Render : https://render.com/docs/blueprint-spec
-# Déploiement tout-en-un (API FastAPI + modèle + interface) sur le plan gratuit, depuis le Dockerfile.
+# Blueprint Render : API FastAPI uniquement. L'interface est sur Vercel.
 services:
   - type: web
     name: atrium
@@ -12,8 +11,8 @@ services:
     envVars:
       - key: PORT
         value: "7860"
-      - key: ATRIUM_STATIC_DIR
-        value: /app/static
+      - key: ATRIUM_FRONTEND_URL
+        value: "https://atrium-chi-flax.vercel.app"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY

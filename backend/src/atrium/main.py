@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 import pandas as pd
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse, Response
+from fastapi.responses import PlainTextResponse, RedirectResponse, Response
 
 from pathlib import Path
 
@@ -298,7 +298,14 @@ def export_patients(format: str = Query("csv", pattern="^(csv|xlsx)$")) -> Respo
     )
 
 
-# --- Frontend construit (image Docker / Space Hugging Face) -------------------------------
+def frontend_public_url(path: str = "", base: str | None = None) -> str:
+    """URL Vercel correspondante (téléphone : une seule interface)."""
+    origin = (settings.atrium_frontend_url if base is None else base).rstrip("/")
+    suffix = path.lstrip("/")
+    return f"{origin}/{suffix}" if suffix else origin
+
+
+# --- Interface : Vercel. Render ne sert plus le dist, sauf dossier local optionnel. ---
 _static = Path(settings.atrium_static_dir) if settings.atrium_static_dir else None
 if _static and (_static / "index.html").exists():
     app.mount("/assets", StaticFiles(directory=_static / "assets"), name="assets")
@@ -307,11 +314,16 @@ if _static and (_static / "index.html").exists():
 
     @app.get("/{full_path:path}", include_in_schema=False)
     def spa(full_path: str) -> Response:
-        """Toute route non-API renvoie l'application : un rafraîchissement garde la page courante."""
         candidate = _static / full_path
         if full_path and candidate.is_file():
             return Response(candidate.read_bytes(), media_type=_guess_type(candidate))
         return Response((_static / "index.html").read_bytes(), media_type="text/html; charset=utf-8")
+elif settings.atrium_frontend_url:
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def to_vercel(full_path: str) -> RedirectResponse:
+        """Une visite hors /api (ex. favori Render) ouvre l'interface Vercel, pas une 2e copie."""
+        return RedirectResponse(frontend_public_url(full_path), status_code=307)
 
 
 def _guess_type(path: Path) -> str:

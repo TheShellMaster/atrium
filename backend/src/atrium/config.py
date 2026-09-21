@@ -19,8 +19,10 @@ class Settings(BaseSettings):
     threshold: float = 0.5
     # Origines autorisées (CORS), séparées par des virgules. Vide = localhost uniquement.
     atrium_cors_origins: str = ""
-    # Dossier du frontend construit à servir (image Docker / Space Hugging Face).
+    # Dossier du frontend construit (optionnel, docker local). Vide = API seulement.
     atrium_static_dir: str = ""
+    # URL publique de l'interface Vercel. Vide en local ; Render la renseigne.
+    atrium_frontend_url: str = ""
     dataset_url: str = (
         "https://raw.githubusercontent.com/kb22/Heart-Disease-Prediction/master/dataset.csv"
     )
